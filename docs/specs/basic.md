@@ -1,0 +1,1 @@
+implemente essa feature e caso precise de alguma decisão técnica, me consulte antes de dar seguimento

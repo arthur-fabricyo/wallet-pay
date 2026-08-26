@@ -1,6 +1,7 @@
 package ElFabrica.Wallet_pay.transaction.controllers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -9,7 +10,12 @@ import ElFabrica.Wallet_pay.config.SecurityConfig;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
 import ElFabrica.Wallet_pay.transaction.service.CreateTransferUseCase;
+import ElFabrica.Wallet_pay.transaction.service.GetReceiptUseCase;
 import ElFabrica.Wallet_pay.transaction.service.InsufficientBalanceException;
+import ElFabrica.Wallet_pay.transaction.service.ReceiptAccessDeniedException;
+import ElFabrica.Wallet_pay.transaction.service.ReceiptResult;
+import ElFabrica.Wallet_pay.transaction.service.ReceiptUnavailableException;
+import ElFabrica.Wallet_pay.transaction.service.TransactionNotFoundException;
 import ElFabrica.Wallet_pay.transaction.service.TransferCommand;
 import ElFabrica.Wallet_pay.transaction.service.TransferResult;
 import ElFabrica.Wallet_pay.transaction.service.TransferSenderWalletResult;
@@ -46,11 +52,18 @@ class TransactionControllerTest {
     @Autowired
     private FakeCreateTransferUseCase createTransferUseCase;
 
+    @Autowired
+    private FakeGetReceiptUseCase getReceiptUseCase;
+
     @BeforeEach
     void setUp() {
         createTransferUseCase.command = null;
         createTransferUseCase.result = null;
         createTransferUseCase.exception = null;
+        getReceiptUseCase.authenticatedUserId = null;
+        getReceiptUseCase.transactionId = null;
+        getReceiptUseCase.result = null;
+        getReceiptUseCase.exception = null;
     }
 
     @Test
@@ -182,6 +195,87 @@ class TransactionControllerTest {
                 .andExpect(jsonPath("$.error").value("Unprocessable Entity"));
     }
 
+    @Test
+    void shouldReturnAuthenticatedUserReceipt() throws Exception {
+        UUID authenticatedUserId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-06T10:30:00Z");
+        getReceiptUseCase.result = new ReceiptResult(
+                transactionId,
+                transactionId,
+                TransactionType.TRANSFER,
+                TransactionStatus.COMPLETED,
+                "25.50",
+                "BRL",
+                "Joao Silva",
+                "***982247**",
+                "Maria Souza",
+                "**345678****",
+                "Almoco",
+                now,
+                now
+        );
+
+        mockMvc.perform(get("/transactions/{transactionId}/receipt", transactionId)
+                        .header("Authorization", "Bearer " + token(authenticatedUserId, Instant.now().plusSeconds(60))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.receiptId").value(transactionId.toString()))
+                .andExpect(jsonPath("$.transactionId").value(transactionId.toString()))
+                .andExpect(jsonPath("$.type").value("TRANSFER"))
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.amount").value("25.50"))
+                .andExpect(jsonPath("$.currency").value("BRL"))
+                .andExpect(jsonPath("$.senderName").value("Joao Silva"))
+                .andExpect(jsonPath("$.senderDocumentMasked").value("***982247**"))
+                .andExpect(jsonPath("$.receiverName").value("Maria Souza"))
+                .andExpect(jsonPath("$.receiverDocumentMasked").value("**345678****"))
+                .andExpect(jsonPath("$.description").value("Almoco"))
+                .andExpect(jsonPath("$.createdAt").value("2026-08-06T10:30:00Z"))
+                .andExpect(jsonPath("$.completedAt").value("2026-08-06T10:30:00Z"));
+
+        assertThat(getReceiptUseCase.authenticatedUserId).isEqualTo(authenticatedUserId);
+        assertThat(getReceiptUseCase.transactionId).isEqualTo(transactionId);
+    }
+
+    @Test
+    void shouldRejectReceiptWithoutJwt() throws Exception {
+        mockMvc.perform(get("/transactions/{transactionId}/receipt", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturnForbiddenWhenUserDoesNotParticipateInReceiptTransaction() throws Exception {
+        getReceiptUseCase.exception = new ReceiptAccessDeniedException("Usuario nao participa da transacao");
+
+        mockMvc.perform(get("/transactions/{transactionId}/receipt", UUID.randomUUID())
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.error").value("Forbidden"));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenReceiptTransactionDoesNotExist() throws Exception {
+        getReceiptUseCase.exception = new TransactionNotFoundException("Transacao nao encontrada");
+
+        mockMvc.perform(get("/transactions/{transactionId}/receipt", UUID.randomUUID())
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"));
+    }
+
+    @Test
+    void shouldReturnConflictWhenReceiptTransactionIsNotCompleted() throws Exception {
+        getReceiptUseCase.exception = new ReceiptUnavailableException("Comprovante disponivel apenas para transacoes concluidas");
+
+        mockMvc.perform(get("/transactions/{transactionId}/receipt", UUID.randomUUID())
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Conflict"));
+    }
+
     private static String token(UUID userId, Instant expiresAt) throws Exception {
         Instant issuedAt = expiresAt.minusSeconds(60);
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
@@ -201,6 +295,11 @@ class TransactionControllerTest {
         FakeCreateTransferUseCase fakeCreateTransferUseCase() {
             return new FakeCreateTransferUseCase();
         }
+
+        @Bean
+        FakeGetReceiptUseCase fakeGetReceiptUseCase() {
+            return new FakeGetReceiptUseCase();
+        }
     }
 
     static class FakeCreateTransferUseCase extends CreateTransferUseCase {
@@ -216,6 +315,28 @@ class TransactionControllerTest {
         @Override
         public TransferResult transfer(TransferCommand command) {
             this.command = command;
+            if (exception != null) {
+                throw exception;
+            }
+            return result;
+        }
+    }
+
+    static class FakeGetReceiptUseCase extends GetReceiptUseCase {
+
+        private UUID authenticatedUserId;
+        private UUID transactionId;
+        private ReceiptResult result;
+        private RuntimeException exception;
+
+        FakeGetReceiptUseCase() {
+            super(null);
+        }
+
+        @Override
+        public ReceiptResult getReceipt(UUID authenticatedUserId, UUID transactionId) {
+            this.authenticatedUserId = authenticatedUserId;
+            this.transactionId = transactionId;
             if (exception != null) {
                 throw exception;
             }

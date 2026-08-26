@@ -8,6 +8,9 @@ import ElFabrica.Wallet_pay.auth.service.InvalidRefreshTokenException;
 import ElFabrica.Wallet_pay.auth.service.PasswordResetTokenException;
 import ElFabrica.Wallet_pay.transaction.service.InsufficientBalanceException;
 import ElFabrica.Wallet_pay.transaction.service.InvalidTransferException;
+import ElFabrica.Wallet_pay.transaction.service.ReceiptAccessDeniedException;
+import ElFabrica.Wallet_pay.transaction.service.ReceiptUnavailableException;
+import ElFabrica.Wallet_pay.transaction.service.TransactionNotFoundException;
 import ElFabrica.Wallet_pay.user.service.CnpjValidationUnavailableException;
 import ElFabrica.Wallet_pay.user.service.DuplicateUserDataException;
 import ElFabrica.Wallet_pay.user.service.InvalidDocumentException;
@@ -162,6 +165,39 @@ public class GlobalExceptionHandler {
                 .body(new ApiErrorResponse(
                         HttpStatus.UNPROCESSABLE_ENTITY.value(),
                         "Unprocessable Entity",
+                        exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(TransactionNotFoundException.class)
+    ResponseEntity<ApiErrorResponse> handleTransactionNotFound(TransactionNotFoundException exception) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(new ApiErrorResponse(
+                        HttpStatus.NOT_FOUND.value(),
+                        "Not Found",
+                        exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(ReceiptAccessDeniedException.class)
+    ResponseEntity<ApiErrorResponse> handleReceiptAccessDenied(ReceiptAccessDeniedException exception) {
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(new ApiErrorResponse(
+                        HttpStatus.FORBIDDEN.value(),
+                        "Forbidden",
+                        exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(ReceiptUnavailableException.class)
+    ResponseEntity<ApiErrorResponse> handleReceiptUnavailable(ReceiptUnavailableException exception) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(new ApiErrorResponse(
+                        HttpStatus.CONFLICT.value(),
+                        "Conflict",
                         exception.getMessage()
                 ));
     }
