@@ -5,7 +5,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ElFabrica.Wallet_pay.config.SecurityConfig;
+import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
+import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
 import ElFabrica.Wallet_pay.wallet.service.GetWalletBalanceUseCase;
+import ElFabrica.Wallet_pay.wallet.service.GetWalletStatementUseCase;
+import ElFabrica.Wallet_pay.wallet.service.InvalidStatementQueryException;
+import ElFabrica.Wallet_pay.wallet.service.StatementDirection;
+import ElFabrica.Wallet_pay.wallet.service.StatementEntryResult;
+import ElFabrica.Wallet_pay.wallet.service.StatementQuery;
+import ElFabrica.Wallet_pay.wallet.service.StatementResult;
 import ElFabrica.Wallet_pay.wallet.service.WalletBalanceResult;
 import ElFabrica.Wallet_pay.wallet.service.WalletNotFoundException;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -15,6 +23,7 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,11 +48,18 @@ class WalletControllerTest {
     @Autowired
     private FakeGetWalletBalanceUseCase getWalletBalanceUseCase;
 
+    @Autowired
+    private FakeGetWalletStatementUseCase getWalletStatementUseCase;
+
     @BeforeEach
     void setUp() {
         getWalletBalanceUseCase.result = null;
         getWalletBalanceUseCase.exception = null;
         getWalletBalanceUseCase.userId = null;
+        getWalletStatementUseCase.result = null;
+        getWalletStatementUseCase.exception = null;
+        getWalletStatementUseCase.userId = null;
+        getWalletStatementUseCase.query = null;
     }
 
     @Test
@@ -89,6 +105,89 @@ class WalletControllerTest {
                 .andExpect(jsonPath("$.error").value("Not Found"));
     }
 
+    @Test
+    void shouldReturnAuthenticatedUserStatement() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-06T10:30:00Z");
+        getWalletStatementUseCase.result = new StatementResult(
+                0,
+                20,
+                1,
+                1,
+                List.of(new StatementEntryResult(
+                        transactionId,
+                        TransactionType.TRANSFER,
+                        TransactionStatus.COMPLETED,
+                        StatementDirection.OUT,
+                        "25.50",
+                        "BRL",
+                        "Maria Souza",
+                        "Almoco",
+                        now,
+                        now
+                ))
+        );
+
+        mockMvc.perform(get("/wallets/me/statement")
+                        .param("from", "2026-08-01T00:00:00Z")
+                        .param("to", "2026-08-31T23:59:59Z")
+                        .param("type", "TRANSFER")
+                        .param("sort", "createdAt,asc")
+                        .header("Authorization", "Bearer " + token(userId, Instant.now().plusSeconds(60))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.items[0].transactionId").value(transactionId.toString()))
+                .andExpect(jsonPath("$.items[0].type").value("TRANSFER"))
+                .andExpect(jsonPath("$.items[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.items[0].direction").value("OUT"))
+                .andExpect(jsonPath("$.items[0].amount").value("25.50"))
+                .andExpect(jsonPath("$.items[0].currency").value("BRL"))
+                .andExpect(jsonPath("$.items[0].counterpartyName").value("Maria Souza"))
+                .andExpect(jsonPath("$.items[0].description").value("Almoco"))
+                .andExpect(jsonPath("$.items[0].createdAt").value("2026-08-06T10:30:00Z"))
+                .andExpect(jsonPath("$.items[0].completedAt").value("2026-08-06T10:30:00Z"));
+
+        org.assertj.core.api.Assertions.assertThat(getWalletStatementUseCase.userId).isEqualTo(userId);
+        org.assertj.core.api.Assertions.assertThat(getWalletStatementUseCase.query.page()).isZero();
+        org.assertj.core.api.Assertions.assertThat(getWalletStatementUseCase.query.size()).isEqualTo(20);
+        org.assertj.core.api.Assertions.assertThat(getWalletStatementUseCase.query.from())
+                .isEqualTo("2026-08-01T00:00:00Z");
+        org.assertj.core.api.Assertions.assertThat(getWalletStatementUseCase.query.to())
+                .isEqualTo("2026-08-31T23:59:59Z");
+        org.assertj.core.api.Assertions.assertThat(getWalletStatementUseCase.query.type()).isEqualTo("TRANSFER");
+        org.assertj.core.api.Assertions.assertThat(getWalletStatementUseCase.query.sort()).isEqualTo("createdAt,asc");
+    }
+
+    @Test
+    void shouldRejectStatementWithoutJwt() throws Exception {
+        mockMvc.perform(get("/wallets/me/statement"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectStatementWithExpiredJwt() throws Exception {
+        mockMvc.perform(get("/wallets/me/statement")
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().minusSeconds(1))))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturnBadRequestForInvalidStatementQuery() throws Exception {
+        getWalletStatementUseCase.exception = new InvalidStatementQueryException("sort invalido");
+
+        mockMvc.perform(get("/wallets/me/statement")
+                        .param("sort", "amount,desc")
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("sort invalido"));
+    }
+
     private static String token(UUID userId, Instant expiresAt) throws Exception {
         Instant issuedAt = expiresAt.minusSeconds(60);
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
@@ -108,6 +207,11 @@ class WalletControllerTest {
         FakeGetWalletBalanceUseCase fakeGetWalletBalanceUseCase() {
             return new FakeGetWalletBalanceUseCase();
         }
+
+        @Bean
+        FakeGetWalletStatementUseCase fakeGetWalletStatementUseCase() {
+            return new FakeGetWalletStatementUseCase();
+        }
     }
 
     static class FakeGetWalletBalanceUseCase extends GetWalletBalanceUseCase {
@@ -123,6 +227,28 @@ class WalletControllerTest {
         @Override
         public WalletBalanceResult getBalance(UUID userId) {
             this.userId = userId;
+            if (exception != null) {
+                throw exception;
+            }
+            return result;
+        }
+    }
+
+    static class FakeGetWalletStatementUseCase extends GetWalletStatementUseCase {
+
+        private UUID userId;
+        private StatementQuery query;
+        private StatementResult result;
+        private RuntimeException exception;
+
+        FakeGetWalletStatementUseCase() {
+            super(null, null);
+        }
+
+        @Override
+        public StatementResult getStatement(UUID authenticatedUserId, StatementQuery query) {
+            this.userId = authenticatedUserId;
+            this.query = query;
             if (exception != null) {
                 throw exception;
             }

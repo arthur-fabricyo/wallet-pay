@@ -15,6 +15,7 @@ import ElFabrica.Wallet_pay.user.service.CnpjValidationUnavailableException;
 import ElFabrica.Wallet_pay.user.service.DuplicateUserDataException;
 import ElFabrica.Wallet_pay.user.service.InvalidDocumentException;
 import ElFabrica.Wallet_pay.wallet.service.WalletNotFoundException;
+import ElFabrica.Wallet_pay.wallet.service.InvalidStatementQueryException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
@@ -209,6 +210,17 @@ public class GlobalExceptionHandler {
                 .body(new ApiErrorResponse(
                         HttpStatus.NOT_FOUND.value(),
                         "Not Found",
+                        exception.getMessage()
+                ));
+    }
+
+    @ExceptionHandler(InvalidStatementQueryException.class)
+    ResponseEntity<ApiErrorResponse> handleInvalidStatementQuery(InvalidStatementQueryException exception) {
+        return ResponseEntity
+                .badRequest()
+                .body(new ApiErrorResponse(
+                        HttpStatus.BAD_REQUEST.value(),
+                        "Bad Request",
                         exception.getMessage()
                 ));
     }
