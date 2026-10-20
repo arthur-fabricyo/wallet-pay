@@ -32,8 +32,8 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
             select t
             from TransactionEntity t
             where (t.senderWallet.id = :walletId or t.receiverWallet.id = :walletId)
-              and (:from is null or t.createdAt >= :from)
-              and (:to is null or t.createdAt <= :to)
+              and (cast(:from as Instant) is null or t.createdAt >= :from)
+              and (cast(:to as Instant) is null or t.createdAt <= :to)
               and (:type is null or t.type = :type)
             """)
     Page<TransactionEntity> findStatementTransactions(

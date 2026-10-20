@@ -1,12 +1,14 @@
 package ElFabrica.Wallet_pay.transaction.service;
 
 import ElFabrica.Wallet_pay.common.money.Money;
+import ElFabrica.Wallet_pay.transaction.domain.TransactionDescription;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.repository.TransactionRepository;
 import ElFabrica.Wallet_pay.wallet.domain.WalletEntity;
 import ElFabrica.Wallet_pay.wallet.repository.WalletRepository;
 import ElFabrica.Wallet_pay.wallet.service.WalletNotFoundException;
 import java.math.BigDecimal;
+import java.time.Clock;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,10 +17,16 @@ public class CreateTransferUseCase {
 
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
+    private final Clock clock;
 
-    public CreateTransferUseCase(WalletRepository walletRepository, TransactionRepository transactionRepository) {
+    public CreateTransferUseCase(
+            WalletRepository walletRepository,
+            TransactionRepository transactionRepository,
+            Clock clock
+    ) {
         this.walletRepository = walletRepository;
         this.transactionRepository = transactionRepository;
+        this.clock = clock;
     }
 
     @Transactional
@@ -49,7 +57,8 @@ public class CreateTransferUseCase {
                 senderWallet,
                 receiverWallet,
                 amount,
-                normalizeDescription(command.description())
+                TransactionDescription.normalize(command.description()),
+                clock.instant()
         ));
 
         return new TransferResult(
@@ -69,12 +78,5 @@ public class CreateTransferUseCase {
                 transaction.getCreatedAt(),
                 transaction.getCompletedAt()
         );
-    }
-
-    private String normalizeDescription(String description) {
-        if (description == null || description.isBlank()) {
-            return null;
-        }
-        return description.trim();
     }
 }

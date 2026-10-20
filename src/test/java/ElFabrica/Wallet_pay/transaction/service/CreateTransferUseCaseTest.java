@@ -14,7 +14,9 @@ import ElFabrica.Wallet_pay.wallet.repository.WalletRepository;
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -22,6 +24,16 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class CreateTransferUseCaseTest {
+
+    private static final Instant NOW = Instant.parse("2026-08-06T10:30:00Z");
+    private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
+
+    private static CreateTransferUseCase useCase(
+            WalletRepository walletRepository,
+            TransactionRepository transactionRepository
+    ) {
+        return new CreateTransferUseCase(walletRepository, transactionRepository, CLOCK);
+    }
 
     @Test
     void shouldTransferBalanceAndRegisterTransaction() {
@@ -36,7 +48,7 @@ class CreateTransferUseCaseTest {
                 receiverUserId, receiverWallet
         ));
         FakeTransactionRepository transactionRepository = new FakeTransactionRepository();
-        CreateTransferUseCase useCase = new CreateTransferUseCase(
+        CreateTransferUseCase useCase = useCase(
                 walletRepository.proxy(),
                 transactionRepository.proxy()
         );
@@ -65,6 +77,7 @@ class CreateTransferUseCaseTest {
         assertThat(result.senderWallet().currency()).isEqualTo("BRL");
         assertThat(result.createdAt()).isNotNull();
         assertThat(result.completedAt()).isNotNull();
+        assertThat(transactionRepository.savedTransaction.getCreatedAt()).isEqualTo(NOW);
     }
 
     @Test
@@ -76,7 +89,7 @@ class CreateTransferUseCaseTest {
                 receiverUserId, wallet(receiverUserId, UUID.randomUUID(), "10.00")
         ));
         FakeTransactionRepository transactionRepository = new FakeTransactionRepository();
-        CreateTransferUseCase useCase = new CreateTransferUseCase(walletRepository.proxy(), transactionRepository.proxy());
+        CreateTransferUseCase useCase = useCase(walletRepository.proxy(), transactionRepository.proxy());
 
         assertThatThrownBy(() -> useCase.transfer(new TransferCommand(
                 senderUserId,
@@ -96,7 +109,7 @@ class CreateTransferUseCaseTest {
         WalletEntity senderWallet = wallet(senderUserId, UUID.randomUUID(), "20.00");
         WalletEntity receiverWallet = wallet(receiverUserId, UUID.randomUUID(), "10.00");
         FakeTransactionRepository transactionRepository = new FakeTransactionRepository();
-        CreateTransferUseCase useCase = new CreateTransferUseCase(
+        CreateTransferUseCase useCase = useCase(
                 new FakeWalletRepository(Map.of(senderUserId, senderWallet, receiverUserId, receiverWallet)).proxy(),
                 transactionRepository.proxy()
         );
@@ -117,7 +130,7 @@ class CreateTransferUseCaseTest {
     void shouldRejectTransferToSameUser() {
         UUID userId = UUID.randomUUID();
         FakeWalletRepository walletRepository = new FakeWalletRepository(Map.of());
-        CreateTransferUseCase useCase = new CreateTransferUseCase(
+        CreateTransferUseCase useCase = useCase(
                 walletRepository.proxy(),
                 new FakeTransactionRepository().proxy()
         );

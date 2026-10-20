@@ -1,11 +1,11 @@
 package ElFabrica.Wallet_pay.transaction.service;
 
+import ElFabrica.Wallet_pay.common.money.Money;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
+import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
 import ElFabrica.Wallet_pay.transaction.repository.TransactionRepository;
 import ElFabrica.Wallet_pay.user.domain.UserEntity;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,11 +24,17 @@ public class GetReceiptUseCase {
         TransactionEntity transaction = transactionRepository.findReceiptById(transactionId)
                 .orElseThrow(() -> new TransactionNotFoundException("Transacao nao encontrada"));
 
-        UserEntity sender = transaction.getSenderWallet().getUser();
+        UserEntity sender = transaction.getSenderWallet() == null ? null : transaction.getSenderWallet().getUser();
         UserEntity receiver = transaction.getReceiverWallet().getUser();
+        boolean participates = (sender != null && sender.getId().equals(authenticatedUserId))
+                || receiver.getId().equals(authenticatedUserId);
 
-        if (!sender.getId().equals(authenticatedUserId) && !receiver.getId().equals(authenticatedUserId)) {
+        if (!participates) {
             throw new ReceiptAccessDeniedException("Usuario nao participa da transacao");
+        }
+
+        if (transaction.getType() != TransactionType.TRANSFER) {
+            throw new ReceiptUnavailableException("Comprovante disponivel apenas para transferencias");
         }
 
         if (transaction.getStatus() != TransactionStatus.COMPLETED) {
@@ -40,7 +46,7 @@ public class GetReceiptUseCase {
                 transaction.getId(),
                 transaction.getType(),
                 transaction.getStatus(),
-                money(transaction.getAmount()),
+                Money.format(transaction.getAmount()),
                 transaction.getCurrency(),
                 sender.getName(),
                 maskDocument(sender.getDocument()),
@@ -67,9 +73,5 @@ public class GetReceiptUseCase {
         return "*".repeat(visibleStart)
                 + digits.substring(visibleStart, visibleEnd)
                 + "*".repeat(digits.length() - visibleEnd);
-    }
-
-    private String money(BigDecimal amount) {
-        return amount.setScale(2, RoundingMode.UNNECESSARY).toPlainString();
     }
 }

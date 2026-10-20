@@ -141,6 +141,31 @@ class GetWalletStatementUseCaseTest {
                 .isInstanceOf(WalletNotFoundException.class);
     }
 
+    @Test
+    void shouldShowDepositAsIncomingWithoutCounterparty() {
+        UUID userId = UUID.randomUUID();
+        WalletEntity ownWallet = wallet(userId, UUID.randomUUID(), "Joao Silva");
+        TransactionEntity deposit = TransactionEntity.completedDeposit(
+                ownWallet,
+                new BigDecimal("150.00"),
+                "Aporte",
+                Instant.parse("2026-10-15T13:00:00Z")
+        );
+        setField(deposit, "id", UUID.randomUUID());
+        GetWalletStatementUseCase useCase = new GetWalletStatementUseCase(
+                new FakeWalletRepository(ownWallet).proxy(),
+                new FakeTransactionRepository(List.of(deposit), 1).proxy()
+        );
+
+        StatementResult result = useCase.getStatement(userId, new StatementQuery(0, 20, null, null, "DEPOSIT", null));
+
+        StatementEntryResult item = result.items().get(0);
+        assertThat(item.type()).isEqualTo(TransactionType.DEPOSIT);
+        assertThat(item.direction()).isEqualTo(StatementDirection.IN);
+        assertThat(item.counterpartyName()).isNull();
+        assertThat(item.amount()).isEqualTo("150.00");
+    }
+
     private static TransactionEntity transaction(
             UUID transactionId,
             WalletEntity senderWallet,
@@ -151,7 +176,8 @@ class GetWalletStatementUseCaseTest {
                 senderWallet,
                 receiverWallet,
                 new BigDecimal("25.50"),
-                "Almoco"
+                "Almoco",
+                now
         );
         setField(transaction, "id", transactionId);
         setField(transaction, "createdAt", now);

@@ -26,8 +26,8 @@ public class TransactionEntity {
     @UuidGenerator
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "sender_wallet_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sender_wallet_id")
     private WalletEntity senderWallet;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -67,30 +67,41 @@ public class TransactionEntity {
     }
 
     private TransactionEntity(
+            TransactionType type,
             WalletEntity senderWallet,
             WalletEntity receiverWallet,
             BigDecimal amount,
-            String description
+            String description,
+            Instant occurredAt
     ) {
+        this.type = type;
         this.senderWallet = senderWallet;
         this.receiverWallet = receiverWallet;
-        this.type = TransactionType.TRANSFER;
         this.status = TransactionStatus.COMPLETED;
         this.amount = amount;
         this.currency = WalletEntity.DEFAULT_CURRENCY;
         this.description = description;
-        Instant now = Instant.now();
-        this.createdAt = now;
-        this.completedAt = now;
+        this.createdAt = occurredAt;
+        this.completedAt = occurredAt;
     }
 
     public static TransactionEntity completedTransfer(
             WalletEntity senderWallet,
             WalletEntity receiverWallet,
             BigDecimal amount,
-            String description
+            String description,
+            Instant occurredAt
     ) {
-        return new TransactionEntity(senderWallet, receiverWallet, amount, description);
+        return new TransactionEntity(TransactionType.TRANSFER, senderWallet, receiverWallet, amount, description, occurredAt);
+    }
+
+    public static TransactionEntity completedDeposit(
+            WalletEntity receiverWallet,
+            BigDecimal amount,
+            String description,
+            Instant occurredAt
+    ) {
+        return new TransactionEntity(TransactionType.DEPOSIT, null, receiverWallet, amount, description, occurredAt);
     }
 
     @PrePersist

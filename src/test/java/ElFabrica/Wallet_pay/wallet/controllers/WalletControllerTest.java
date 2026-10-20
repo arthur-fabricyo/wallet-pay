@@ -1,12 +1,20 @@
 package ElFabrica.Wallet_pay.wallet.controllers;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ElFabrica.Wallet_pay.common.money.InvalidAmountException;
 import ElFabrica.Wallet_pay.config.SecurityConfig;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
+import ElFabrica.Wallet_pay.wallet.service.DepositCommand;
+import ElFabrica.Wallet_pay.wallet.service.DepositResult;
+import ElFabrica.Wallet_pay.wallet.service.DepositService;
+import ElFabrica.Wallet_pay.wallet.service.DepositWalletResult;
 import ElFabrica.Wallet_pay.wallet.service.GetWalletBalanceUseCase;
 import ElFabrica.Wallet_pay.wallet.service.GetWalletStatementUseCase;
 import ElFabrica.Wallet_pay.wallet.service.InvalidStatementQueryException;
@@ -32,6 +40,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -51,6 +60,9 @@ class WalletControllerTest {
     @Autowired
     private FakeGetWalletStatementUseCase getWalletStatementUseCase;
 
+    @Autowired
+    private FakeDepositService depositService;
+
     @BeforeEach
     void setUp() {
         getWalletBalanceUseCase.result = null;
@@ -60,6 +72,9 @@ class WalletControllerTest {
         getWalletStatementUseCase.exception = null;
         getWalletStatementUseCase.userId = null;
         getWalletStatementUseCase.query = null;
+        depositService.command = null;
+        depositService.result = null;
+        depositService.exception = null;
     }
 
     @Test
@@ -200,6 +215,95 @@ class WalletControllerTest {
         return jwt.serialize();
     }
 
+    @Test
+    void shouldCreateDepositForAuthenticatedUser() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID walletId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-10-15T10:30:00Z");
+        depositService.result = new DepositResult(
+                transactionId,
+                TransactionType.DEPOSIT,
+                TransactionStatus.COMPLETED,
+                "150.00",
+                "BRL",
+                "Aporte inicial",
+                new DepositWalletResult(walletId, "250.00", "BRL", now),
+                now,
+                now
+        );
+
+        mockMvc.perform(post("/wallets/me/deposits")
+                        .header("Authorization", "Bearer " + token(userId, Instant.now().plusSeconds(60)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": "150.00",
+                                  "description": "Aporte inicial"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/transactions/" + transactionId))
+                .andExpect(jsonPath("$.transactionId").value(transactionId.toString()))
+                .andExpect(jsonPath("$.type").value("DEPOSIT"))
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.amount").value("150.00"))
+                .andExpect(jsonPath("$.currency").value("BRL"))
+                .andExpect(jsonPath("$.description").value("Aporte inicial"))
+                .andExpect(jsonPath("$.wallet.id").value(walletId.toString()))
+                .andExpect(jsonPath("$.wallet.balance").value("250.00"))
+                .andExpect(jsonPath("$.wallet.updatedAt").value("2026-10-15T10:30:00Z"))
+                .andExpect(jsonPath("$.createdAt").value("2026-10-15T10:30:00Z"));
+
+        assertThat(depositService.command.userId()).isEqualTo(userId);
+        assertThat(depositService.command.amount()).isEqualTo("150.00");
+        assertThat(depositService.command.description()).isEqualTo("Aporte inicial");
+    }
+
+    @Test
+    void shouldRejectDepositWithoutJwt() throws Exception {
+        mockMvc.perform(post("/wallets/me/deposits")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": "150.00"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectDepositDescriptionLongerThan255Characters() throws Exception {
+        mockMvc.perform(post("/wallets/me/deposits")
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": "150.00",
+                                  "description": "%s"
+                                }
+                                """.formatted("a".repeat(256))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fields.description").value("Descricao deve ter no maximo 255 caracteres"));
+    }
+
+    @Test
+    void shouldReturnInvalidAmountCodeForDeposit() throws Exception {
+        depositService.exception = new InvalidAmountException("Valor deve ser maior que zero");
+
+        mockMvc.perform(post("/wallets/me/deposits")
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": "0"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_AMOUNT"));
+    }
+
     @TestConfiguration
     static class TestBeans {
 
@@ -211,6 +315,11 @@ class WalletControllerTest {
         @Bean
         FakeGetWalletStatementUseCase fakeGetWalletStatementUseCase() {
             return new FakeGetWalletStatementUseCase();
+        }
+
+        @Bean
+        FakeDepositService fakeDepositService() {
+            return new FakeDepositService();
         }
     }
 
@@ -249,6 +358,26 @@ class WalletControllerTest {
         public StatementResult getStatement(UUID authenticatedUserId, StatementQuery query) {
             this.userId = authenticatedUserId;
             this.query = query;
+            if (exception != null) {
+                throw exception;
+            }
+            return result;
+        }
+    }
+
+    static class FakeDepositService extends DepositService {
+
+        private DepositCommand command;
+        private DepositResult result;
+        private RuntimeException exception;
+
+        FakeDepositService() {
+            super(null, null);
+        }
+
+        @Override
+        public DepositResult deposit(DepositCommand command) {
+            this.command = command;
             if (exception != null) {
                 throw exception;
             }

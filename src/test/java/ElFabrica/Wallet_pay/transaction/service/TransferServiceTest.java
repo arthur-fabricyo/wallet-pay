@@ -73,7 +73,7 @@ class TransferServiceTest {
         private int calls;
 
         FakeCreateTransferUseCase(int failuresBeforeSuccess) {
-            super(null, null);
+            super(null, null, null);
             this.failuresBeforeSuccess = failuresBeforeSuccess;
         }
 
