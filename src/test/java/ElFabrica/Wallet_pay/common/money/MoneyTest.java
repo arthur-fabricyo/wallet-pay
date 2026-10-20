@@ -61,7 +61,7 @@ class MoneyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"100000000000000000", "100000000000000000000", "1E+30"})
+    @ValueSource(strings = {"100000000000000000", "100000000000000000000", "1E+30", "1E+2147483646", "1E+2147483647"})
     void shouldRejectAmountsThatDoNotFitTheDatabaseColumn(String raw) {
         assertThatThrownBy(() -> Money.parse(raw))
                 .isInstanceOf(InvalidAmountException.class)

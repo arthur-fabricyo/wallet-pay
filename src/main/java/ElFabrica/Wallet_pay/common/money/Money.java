@@ -29,7 +29,7 @@ public final class Money {
         if (amount.scale() > SCALE) {
             throw new InvalidAmountException("Valor deve ter no maximo duas casas decimais");
         }
-        if (amount.precision() - amount.scale() > MAX_INTEGER_DIGITS) {
+        if ((long) amount.precision() - amount.scale() > MAX_INTEGER_DIGITS) {
             throw new InvalidAmountException("Valor invalido");
         }
         return amount.setScale(SCALE, RoundingMode.UNNECESSARY);
