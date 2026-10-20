@@ -16,8 +16,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.envers.Audited;
 
 @Entity
+@Audited
 @Table(name = "transactions")
 public class TransactionEntity {
 

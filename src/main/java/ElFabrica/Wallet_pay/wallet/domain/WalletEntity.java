@@ -17,8 +17,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.envers.Audited;
 
 @Entity
+@Audited
 @Table(
         name = "wallets",
         uniqueConstraints = @UniqueConstraint(name = "uk_wallets_user_id", columnNames = "user_id"))
