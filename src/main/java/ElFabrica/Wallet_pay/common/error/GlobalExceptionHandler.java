@@ -1,31 +1,34 @@
 package ElFabrica.Wallet_pay.common.error;
 
-import ElFabrica.Wallet_pay.auth.service.EmailNotVerifiedException;
-import ElFabrica.Wallet_pay.auth.service.EmailVerificationTokenException;
-import ElFabrica.Wallet_pay.auth.service.InvalidPasswordPolicyException;
-import ElFabrica.Wallet_pay.auth.service.InvalidCredentialsException;
-import ElFabrica.Wallet_pay.auth.service.InvalidRefreshTokenException;
-import ElFabrica.Wallet_pay.auth.service.PasswordResetTokenException;
-import ElFabrica.Wallet_pay.transaction.service.InsufficientBalanceException;
-import ElFabrica.Wallet_pay.transaction.service.InvalidTransferException;
-import ElFabrica.Wallet_pay.transaction.service.ReceiptAccessDeniedException;
-import ElFabrica.Wallet_pay.transaction.service.ReceiptUnavailableException;
-import ElFabrica.Wallet_pay.transaction.service.TransactionNotFoundException;
-import ElFabrica.Wallet_pay.user.service.CnpjValidationUnavailableException;
-import ElFabrica.Wallet_pay.user.service.DuplicateUserDataException;
-import ElFabrica.Wallet_pay.user.service.InvalidDocumentException;
-import ElFabrica.Wallet_pay.wallet.service.WalletNotFoundException;
-import ElFabrica.Wallet_pay.wallet.service.InvalidStatementQueryException;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.springframework.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+
+    @ExceptionHandler(BusinessException.class)
+    ResponseEntity<ApiErrorResponse> handleBusiness(BusinessException exception) {
+        LOGGER.warn("Erro de negocio {}: {}", exception.getErrorCode(), exception.getMessage());
+        return error(exception.getErrorCode(), exception.getMessage(), exception.getFields());
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiErrorResponse> handleValidation(MethodArgumentNotValidException exception) {
@@ -33,195 +36,68 @@ public class GlobalExceptionHandler {
         exception.getBindingResult().getFieldErrors().forEach(error ->
                 fields.putIfAbsent(error.getField(), error.getDefaultMessage())
         );
-
-        return ResponseEntity
-                .badRequest()
-                .body(new ApiErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
-                        "Bad Request",
-                        "Dados invalidos",
-                        fields
-                ));
+        return error(ErrorCode.VALIDATION_ERROR, "Dados invalidos", fields);
     }
 
-    @ExceptionHandler(InvalidDocumentException.class)
-    ResponseEntity<ApiErrorResponse> handleInvalidDocument(InvalidDocumentException exception) {
-        return ResponseEntity
-                .badRequest()
-                .body(new ApiErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
-                        "Bad Request",
-                        exception.getMessage(),
-                        Map.of("document", exception.getMessage())
-                ));
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ResponseEntity<ApiErrorResponse> handleMalformedRequest(HttpMessageNotReadableException exception) {
+        return error(ErrorCode.MALFORMED_REQUEST, "Corpo da requisicao invalido", Map.of());
     }
 
-    @ExceptionHandler(DuplicateUserDataException.class)
-    ResponseEntity<ApiErrorResponse> handleDuplicateUserData(DuplicateUserDataException exception) {
-        return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .body(new ApiErrorResponse(
-                        HttpStatus.CONFLICT.value(),
-                        "Conflict",
-                        exception.getMessage()
-                ));
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
+        return error(ErrorCode.INVALID_PARAMETER, "Parametro invalido", Map.of(exception.getName(), "Valor invalido"));
     }
 
-    @ExceptionHandler(InvalidCredentialsException.class)
-    ResponseEntity<ApiErrorResponse> handleInvalidCredentials(InvalidCredentialsException exception) {
-        return ResponseEntity
-                .status(HttpStatus.UNAUTHORIZED)
-                .body(new ApiErrorResponse(
-                        HttpStatus.UNAUTHORIZED.value(),
-                        "Unauthorized",
-                        exception.getMessage()
-                ));
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    ResponseEntity<ApiErrorResponse> handleMissingParameter(MissingServletRequestParameterException exception) {
+        return error(
+                ErrorCode.INVALID_PARAMETER,
+                "Parametro obrigatorio ausente",
+                Map.of(exception.getParameterName(), "Parametro obrigatorio")
+        );
     }
 
-    @ExceptionHandler(InvalidRefreshTokenException.class)
-    ResponseEntity<ApiErrorResponse> handleInvalidRefreshToken(InvalidRefreshTokenException exception) {
-        return ResponseEntity
-                .status(HttpStatus.UNAUTHORIZED)
-                .body(new ApiErrorResponse(
-                        HttpStatus.UNAUTHORIZED.value(),
-                        "Unauthorized",
-                        exception.getMessage()
-                ));
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    ResponseEntity<ApiErrorResponse> handleMissingHeader(MissingRequestHeaderException exception) {
+        if (IDEMPOTENCY_KEY_HEADER.equalsIgnoreCase(exception.getHeaderName())) {
+            return error(ErrorCode.IDEMPOTENCY_KEY_REQUIRED, "Idempotency-Key e obrigatorio", Map.of());
+        }
+        return error(
+                ErrorCode.INVALID_PARAMETER,
+                "Header obrigatorio ausente",
+                Map.of(exception.getHeaderName(), "Header obrigatorio")
+        );
     }
 
-    @ExceptionHandler(EmailNotVerifiedException.class)
-    ResponseEntity<ApiErrorResponse> handleEmailNotVerified(EmailNotVerifiedException exception) {
-        return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
-                .body(new ApiErrorResponse(
-                        HttpStatus.FORBIDDEN.value(),
-                        "Forbidden",
-                        "EMAIL_NOT_VERIFIED",
-                        exception.getMessage()
-                ));
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ApiErrorResponse> handleMethodNotAllowed(HttpRequestMethodNotSupportedException exception) {
+        return error(ErrorCode.METHOD_NOT_ALLOWED, "Metodo HTTP nao suportado", Map.of());
     }
 
-    @ExceptionHandler(EmailVerificationTokenException.class)
-    ResponseEntity<ApiErrorResponse> handleEmailVerificationToken(EmailVerificationTokenException exception) {
-        return ResponseEntity
-                .badRequest()
-                .body(new ApiErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
-                        "Bad Request",
-                        exception.getCode(),
-                        exception.getMessage()
-                ));
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    ResponseEntity<ApiErrorResponse> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException exception) {
+        return error(ErrorCode.UNSUPPORTED_MEDIA_TYPE, "Content-Type nao suportado", Map.of());
     }
 
-    @ExceptionHandler(PasswordResetTokenException.class)
-    ResponseEntity<ApiErrorResponse> handlePasswordResetToken(PasswordResetTokenException exception) {
-        return ResponseEntity
-                .badRequest()
-                .body(new ApiErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
-                        "Bad Request",
-                        exception.getCode(),
-                        exception.getMessage()
-                ));
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    ResponseEntity<ApiErrorResponse> handleRouteNotFound(Exception exception) {
+        return error(ErrorCode.ROUTE_NOT_FOUND, "Rota nao encontrada", Map.of());
     }
 
-    @ExceptionHandler(InvalidPasswordPolicyException.class)
-    ResponseEntity<ApiErrorResponse> handleInvalidPasswordPolicy(InvalidPasswordPolicyException exception) {
-        return ResponseEntity
-                .badRequest()
-                .body(new ApiErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
-                        "Bad Request",
-                        exception.getMessage(),
-                        Map.of("newPassword", exception.getMessage())
-                ));
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<ApiErrorResponse> handleDataIntegrity(DataIntegrityViolationException exception) {
+        LOGGER.warn("Violacao de integridade nao tratada", exception);
+        return error(ErrorCode.DATA_CONFLICT, "Conflito de dados", Map.of());
     }
 
-    @ExceptionHandler(CnpjValidationUnavailableException.class)
-    ResponseEntity<ApiErrorResponse> handleCnpjValidationUnavailable(CnpjValidationUnavailableException exception) {
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ApiErrorResponse(
-                        HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                        "Internal Server Error",
-                        exception.getMessage()
-                ));
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<ApiErrorResponse> handleUnexpected(Exception exception) {
+        LOGGER.error("Erro inesperado", exception);
+        return error(ErrorCode.INTERNAL_ERROR, "Erro interno, informe o requestId ao suporte", Map.of());
     }
 
-    @ExceptionHandler(InvalidTransferException.class)
-    ResponseEntity<ApiErrorResponse> handleInvalidTransfer(InvalidTransferException exception) {
-        return ResponseEntity
-                .badRequest()
-                .body(new ApiErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
-                        "Bad Request",
-                        exception.getMessage()
-                ));
-    }
-
-    @ExceptionHandler(InsufficientBalanceException.class)
-    ResponseEntity<ApiErrorResponse> handleInsufficientBalance(InsufficientBalanceException exception) {
-        return ResponseEntity
-                .status(HttpStatus.UNPROCESSABLE_ENTITY)
-                .body(new ApiErrorResponse(
-                        HttpStatus.UNPROCESSABLE_ENTITY.value(),
-                        "Unprocessable Entity",
-                        exception.getMessage()
-                ));
-    }
-
-    @ExceptionHandler(TransactionNotFoundException.class)
-    ResponseEntity<ApiErrorResponse> handleTransactionNotFound(TransactionNotFoundException exception) {
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(new ApiErrorResponse(
-                        HttpStatus.NOT_FOUND.value(),
-                        "Not Found",
-                        exception.getMessage()
-                ));
-    }
-
-    @ExceptionHandler(ReceiptAccessDeniedException.class)
-    ResponseEntity<ApiErrorResponse> handleReceiptAccessDenied(ReceiptAccessDeniedException exception) {
-        return ResponseEntity
-                .status(HttpStatus.FORBIDDEN)
-                .body(new ApiErrorResponse(
-                        HttpStatus.FORBIDDEN.value(),
-                        "Forbidden",
-                        exception.getMessage()
-                ));
-    }
-
-    @ExceptionHandler(ReceiptUnavailableException.class)
-    ResponseEntity<ApiErrorResponse> handleReceiptUnavailable(ReceiptUnavailableException exception) {
-        return ResponseEntity
-                .status(HttpStatus.CONFLICT)
-                .body(new ApiErrorResponse(
-                        HttpStatus.CONFLICT.value(),
-                        "Conflict",
-                        exception.getMessage()
-                ));
-    }
-
-    @ExceptionHandler(WalletNotFoundException.class)
-    ResponseEntity<ApiErrorResponse> handleWalletNotFound(WalletNotFoundException exception) {
-        return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
-                .body(new ApiErrorResponse(
-                        HttpStatus.NOT_FOUND.value(),
-                        "Not Found",
-                        exception.getMessage()
-                ));
-    }
-
-    @ExceptionHandler(InvalidStatementQueryException.class)
-    ResponseEntity<ApiErrorResponse> handleInvalidStatementQuery(InvalidStatementQueryException exception) {
-        return ResponseEntity
-                .badRequest()
-                .body(new ApiErrorResponse(
-                        HttpStatus.BAD_REQUEST.value(),
-                        "Bad Request",
-                        exception.getMessage()
-                ));
+    static ResponseEntity<ApiErrorResponse> error(ErrorCode code, String message, Map<String, String> fields) {
+        return ResponseEntity.status(code.status()).body(ApiErrorResponse.of(code, message, fields));
     }
 }

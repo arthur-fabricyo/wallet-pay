@@ -1,5 +1,6 @@
 package ElFabrica.Wallet_pay.auth.service;
 
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -75,7 +76,7 @@ class EmailVerificationServiceTest {
 
         assertThatThrownBy(() -> service.confirm("missing-token"))
                 .isInstanceOfSatisfying(EmailVerificationTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(EmailVerificationService.TOKEN_INVALID));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID));
     }
 
     @Test
@@ -87,7 +88,7 @@ class EmailVerificationServiceTest {
 
         assertThatThrownBy(() -> service.confirm(" "))
                 .isInstanceOfSatisfying(EmailVerificationTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(EmailVerificationService.TOKEN_INVALID));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID));
     }
 
     @Test
@@ -104,7 +105,7 @@ class EmailVerificationServiceTest {
 
         assertThatThrownBy(() -> service.confirm("expired-token"))
                 .isInstanceOfSatisfying(EmailVerificationTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(EmailVerificationService.TOKEN_EXPIRED));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EMAIL_VERIFICATION_TOKEN_EXPIRED));
     }
 
     @Test
@@ -122,7 +123,7 @@ class EmailVerificationServiceTest {
 
         assertThatThrownBy(() -> service.confirm("used-token"))
                 .isInstanceOfSatisfying(EmailVerificationTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(EmailVerificationService.TOKEN_ALREADY_USED));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EMAIL_VERIFICATION_TOKEN_ALREADY_USED));
     }
 
     @Test

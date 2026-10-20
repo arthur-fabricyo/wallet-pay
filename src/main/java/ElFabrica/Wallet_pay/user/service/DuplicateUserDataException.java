@@ -1,8 +1,11 @@
 package ElFabrica.Wallet_pay.user.service;
 
-public class DuplicateUserDataException extends RuntimeException {
+import ElFabrica.Wallet_pay.common.error.BusinessException;
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
+
+public class DuplicateUserDataException extends BusinessException {
 
     public DuplicateUserDataException(String message) {
-        super(message);
+        super(ErrorCode.DUPLICATE_USER_DATA, message);
     }
 }

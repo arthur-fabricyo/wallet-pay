@@ -9,15 +9,13 @@ public record ApiErrorResponse(
         String message,
         Map<String, String> fields
 ) {
-    public ApiErrorResponse(int status, String error, String message) {
-        this(status, error, null, message, Map.of());
-    }
-
-    public ApiErrorResponse(int status, String error, String message, Map<String, String> fields) {
-        this(status, error, null, message, fields);
-    }
-
-    public ApiErrorResponse(int status, String error, String code, String message) {
-        this(status, error, code, message, Map.of());
+    public static ApiErrorResponse of(ErrorCode code, String message, Map<String, String> fields) {
+        return new ApiErrorResponse(
+                code.status(),
+                code.error(),
+                code.name(),
+                message,
+                fields == null ? Map.of() : fields
+        );
     }
 }

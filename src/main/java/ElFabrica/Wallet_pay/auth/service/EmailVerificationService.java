@@ -1,5 +1,6 @@
 package ElFabrica.Wallet_pay.auth.service;
 
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
 import ElFabrica.Wallet_pay.auth.domain.EmailVerificationTokenEntity;
 import ElFabrica.Wallet_pay.auth.repository.EmailVerificationTokenRepository;
 import ElFabrica.Wallet_pay.user.domain.UserEntity;
@@ -15,10 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class EmailVerificationService implements EmailVerificationTokenIssuer {
-
-    public static final String TOKEN_INVALID = "EMAIL_VERIFICATION_TOKEN_INVALID";
-    public static final String TOKEN_EXPIRED = "EMAIL_VERIFICATION_TOKEN_EXPIRED";
-    public static final String TOKEN_ALREADY_USED = "EMAIL_VERIFICATION_TOKEN_ALREADY_USED";
 
     private static final int TOKEN_BYTES = 32;
 
@@ -88,11 +85,11 @@ public class EmailVerificationService implements EmailVerificationTokenIssuer {
 
         Instant now = Instant.now();
         if (token.isExpired(now)) {
-            throw new EmailVerificationTokenException(TOKEN_EXPIRED, "Token de verificacao expirado");
+            throw new EmailVerificationTokenException(ErrorCode.EMAIL_VERIFICATION_TOKEN_EXPIRED, "Token de verificacao expirado");
         }
 
         if (token.isUsed()) {
-            throw new EmailVerificationTokenException(TOKEN_ALREADY_USED, "Token de verificacao ja utilizado");
+            throw new EmailVerificationTokenException(ErrorCode.EMAIL_VERIFICATION_TOKEN_ALREADY_USED, "Token de verificacao ja utilizado");
         }
 
         token.markUsed(now);
@@ -106,6 +103,6 @@ public class EmailVerificationService implements EmailVerificationTokenIssuer {
     }
 
     private EmailVerificationTokenException invalidToken(String message) {
-        return new EmailVerificationTokenException(TOKEN_INVALID, message);
+        return new EmailVerificationTokenException(ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID, message);
     }
 }

@@ -1,5 +1,6 @@
 package ElFabrica.Wallet_pay.auth.service;
 
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
 import ElFabrica.Wallet_pay.auth.domain.PasswordResetTokenEntity;
 import ElFabrica.Wallet_pay.auth.repository.PasswordResetTokenRepository;
 import ElFabrica.Wallet_pay.auth.repository.RefreshTokenRepository;
@@ -17,10 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PasswordRecoveryService {
-
-    public static final String TOKEN_INVALID = "PASSWORD_RESET_TOKEN_INVALID";
-    public static final String TOKEN_EXPIRED = "PASSWORD_RESET_TOKEN_EXPIRED";
-    public static final String TOKEN_ALREADY_USED = "PASSWORD_RESET_TOKEN_ALREADY_USED";
 
     private static final int TOKEN_BYTES = 32;
     private static final String PASSWORD_POLICY_PATTERN = "^(?=.*[A-Za-z])(?=.*\\d).+$";
@@ -89,11 +86,11 @@ public class PasswordRecoveryService {
 
         Instant now = Instant.now();
         if (token.isExpired(now)) {
-            throw new PasswordResetTokenException(TOKEN_EXPIRED, "Token de redefinicao de senha expirado");
+            throw new PasswordResetTokenException(ErrorCode.PASSWORD_RESET_TOKEN_EXPIRED, "Token de redefinicao de senha expirado");
         }
 
         if (token.isUsed()) {
-            throw new PasswordResetTokenException(TOKEN_ALREADY_USED, "Token de redefinicao de senha ja utilizado");
+            throw new PasswordResetTokenException(ErrorCode.PASSWORD_RESET_TOKEN_ALREADY_USED, "Token de redefinicao de senha ja utilizado");
         }
 
         validatePassword(newPassword);
@@ -128,6 +125,6 @@ public class PasswordRecoveryService {
     }
 
     private PasswordResetTokenException invalidToken(String message) {
-        return new PasswordResetTokenException(TOKEN_INVALID, message);
+        return new PasswordResetTokenException(ErrorCode.PASSWORD_RESET_TOKEN_INVALID, message);
     }
 }

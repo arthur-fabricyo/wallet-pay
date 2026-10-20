@@ -1,5 +1,6 @@
 package ElFabrica.Wallet_pay.auth.service;
 
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -84,7 +85,7 @@ class PasswordRecoveryServiceTest {
 
         assertThatThrownBy(() -> service.reset("missing-token", "NovaSenha123"))
                 .isInstanceOfSatisfying(PasswordResetTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(PasswordRecoveryService.TOKEN_INVALID));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_RESET_TOKEN_INVALID));
     }
 
     @Test
@@ -97,7 +98,7 @@ class PasswordRecoveryServiceTest {
 
         assertThatThrownBy(() -> service.reset(" ", "NovaSenha123"))
                 .isInstanceOfSatisfying(PasswordResetTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(PasswordRecoveryService.TOKEN_INVALID));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_RESET_TOKEN_INVALID));
     }
 
     @Test
@@ -115,7 +116,7 @@ class PasswordRecoveryServiceTest {
 
         assertThatThrownBy(() -> service.reset("expired-token", "NovaSenha123"))
                 .isInstanceOfSatisfying(PasswordResetTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(PasswordRecoveryService.TOKEN_EXPIRED));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_RESET_TOKEN_EXPIRED));
     }
 
     @Test
@@ -134,7 +135,7 @@ class PasswordRecoveryServiceTest {
 
         assertThatThrownBy(() -> service.reset("used-token", "NovaSenha123"))
                 .isInstanceOfSatisfying(PasswordResetTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(PasswordRecoveryService.TOKEN_ALREADY_USED));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_RESET_TOKEN_ALREADY_USED));
     }
 
     @Test

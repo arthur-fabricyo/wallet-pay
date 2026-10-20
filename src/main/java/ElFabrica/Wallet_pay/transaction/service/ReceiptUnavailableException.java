@@ -1,8 +1,11 @@
 package ElFabrica.Wallet_pay.transaction.service;
 
-public class ReceiptUnavailableException extends RuntimeException {
+import ElFabrica.Wallet_pay.common.error.BusinessException;
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
+
+public class ReceiptUnavailableException extends BusinessException {
 
     public ReceiptUnavailableException(String message) {
-        super(message);
+        super(ErrorCode.RECEIPT_UNAVAILABLE, message);
     }
 }
