@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -217,6 +218,14 @@ class GlobalExceptionHandlerTest {
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 
+    @Test
+    void shouldMapConcurrentUpdateOutsideBalanceOperationsToDataConflict() throws Exception {
+        mockMvc.perform(get("/probe/optimistic").header("Authorization", auth()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DATA_CONFLICT"))
+                .andExpect(content().string(not(containsString("wallet_limits"))));
+    }
+
     @RestController
     @RequestMapping("/probe")
     static class ProbeController {
@@ -239,6 +248,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/integrity")
         void integrity() {
             throw new DataIntegrityViolationException("violates unique constraint uk_users_email");
+        }
+
+        @GetMapping("/optimistic")
+        void optimistic() {
+            throw new OptimisticLockingFailureException("versao alterada em wallet_limits");
         }
 
         @PostMapping(value = "/body", consumes = MediaType.APPLICATION_JSON_VALUE)

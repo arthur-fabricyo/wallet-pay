@@ -5,6 +5,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -88,6 +89,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     ResponseEntity<ApiErrorResponse> handleDataIntegrity(DataIntegrityViolationException exception) {
         LOGGER.warn("Violacao de integridade nao tratada", exception);
+        return error(ErrorCode.DATA_CONFLICT, "Conflito de dados", Map.of());
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ResponseEntity<ApiErrorResponse> handleOptimisticLocking(OptimisticLockingFailureException exception) {
+        LOGGER.warn("Conflito de versao fora de operacao de saldo", exception);
         return error(ErrorCode.DATA_CONFLICT, "Conflito de dados", Map.of());
     }
 

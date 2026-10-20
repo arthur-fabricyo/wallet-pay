@@ -7,15 +7,21 @@ import ElFabrica.Wallet_pay.wallet.dto.DepositResponseDTO;
 import ElFabrica.Wallet_pay.wallet.dto.DepositWalletResponseDTO;
 import ElFabrica.Wallet_pay.wallet.dto.StatementEntryResponseDTO;
 import ElFabrica.Wallet_pay.wallet.dto.StatementResponseDTO;
+import ElFabrica.Wallet_pay.wallet.dto.UpdateWalletLimitsRequestDTO;
 import ElFabrica.Wallet_pay.wallet.dto.WalletBalanceResponseDTO;
+import ElFabrica.Wallet_pay.wallet.dto.WalletLimitsResponseDTO;
 import ElFabrica.Wallet_pay.wallet.service.DepositCommand;
 import ElFabrica.Wallet_pay.wallet.service.DepositResult;
 import ElFabrica.Wallet_pay.wallet.service.DepositService;
 import ElFabrica.Wallet_pay.wallet.service.GetWalletBalanceUseCase;
+import ElFabrica.Wallet_pay.wallet.service.GetWalletLimitsUseCase;
 import ElFabrica.Wallet_pay.wallet.service.GetWalletStatementUseCase;
 import ElFabrica.Wallet_pay.wallet.service.StatementQuery;
 import ElFabrica.Wallet_pay.wallet.service.StatementResult;
+import ElFabrica.Wallet_pay.wallet.service.UpdateWalletLimitsCommand;
+import ElFabrica.Wallet_pay.wallet.service.UpdateWalletLimitsUseCase;
 import ElFabrica.Wallet_pay.wallet.service.WalletBalanceResult;
+import ElFabrica.Wallet_pay.wallet.service.WalletLimitsResult;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
@@ -24,6 +30,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,15 +44,21 @@ public class WalletController {
     private final GetWalletBalanceUseCase getWalletBalanceUseCase;
     private final GetWalletStatementUseCase getWalletStatementUseCase;
     private final DepositService depositService;
+    private final GetWalletLimitsUseCase getWalletLimitsUseCase;
+    private final UpdateWalletLimitsUseCase updateWalletLimitsUseCase;
 
     public WalletController(
             GetWalletBalanceUseCase getWalletBalanceUseCase,
             GetWalletStatementUseCase getWalletStatementUseCase,
-            DepositService depositService
+            DepositService depositService,
+            GetWalletLimitsUseCase getWalletLimitsUseCase,
+            UpdateWalletLimitsUseCase updateWalletLimitsUseCase
     ) {
         this.getWalletBalanceUseCase = getWalletBalanceUseCase;
         this.getWalletStatementUseCase = getWalletStatementUseCase;
         this.depositService = depositService;
+        this.getWalletLimitsUseCase = getWalletLimitsUseCase;
+        this.updateWalletLimitsUseCase = updateWalletLimitsUseCase;
     }
 
     @GetMapping("/me/balance")
@@ -116,6 +129,64 @@ public class WalletController {
             builder.header(IdempotencyKeys.REPLAYED_HEADER, "true");
         }
         return builder.body(toResponse(result));
+    }
+
+    @GetMapping("/me/limits")
+    ResponseEntity<WalletLimitsResponseDTO> getMyLimits(@AuthenticationPrincipal Jwt jwt) {
+        WalletLimitsResult result = getWalletLimitsUseCase.getLimits(UUID.fromString(jwt.getSubject()));
+        return ResponseEntity.ok(toResponse(result));
+    }
+
+    @PutMapping("/me/limits")
+    ResponseEntity<WalletLimitsResponseDTO> updateMyLimits(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody UpdateWalletLimitsRequestDTO request
+    ) {
+        WalletLimitsResult result = updateWalletLimitsUseCase.update(new UpdateWalletLimitsCommand(
+                UUID.fromString(jwt.getSubject()),
+                request.transferPerOperation(),
+                request.transferDaily(),
+                request.transferMonthly(),
+                request.transferNightPerOperation(),
+                request.transferNightWindow()
+        ));
+        return ResponseEntity.ok(toResponse(result));
+    }
+
+    private static WalletLimitsResponseDTO toResponse(WalletLimitsResult result) {
+        return new WalletLimitsResponseDTO(
+                new WalletLimitsResponseDTO.TransferLimits(
+                        limitValue(result.transfer().perOperation()),
+                        periodValue(result.transfer().daily()),
+                        periodValue(result.transfer().monthly()),
+                        limitValue(result.transfer().nightPerOperation()),
+                        periodValue(result.transfer().nightWindow())
+                ),
+                new WalletLimitsResponseDTO.DepositLimits(
+                        limitValue(result.deposit().perOperation()),
+                        periodValue(result.deposit().daily())
+                ),
+                new WalletLimitsResponseDTO.Night(
+                        result.night().start(),
+                        result.night().end(),
+                        result.night().timezone(),
+                        result.night().active()
+                )
+        );
+    }
+
+    private static WalletLimitsResponseDTO.LimitValue limitValue(WalletLimitsResult.LimitValue value) {
+        return new WalletLimitsResponseDTO.LimitValue(value.effective(), value.global(), value.custom());
+    }
+
+    private static WalletLimitsResponseDTO.PeriodLimitValue periodValue(WalletLimitsResult.PeriodLimitValue value) {
+        return new WalletLimitsResponseDTO.PeriodLimitValue(
+                value.effective(),
+                value.global(),
+                value.custom(),
+                value.used(),
+                value.available()
+        );
     }
 
     private static DepositResponseDTO toResponse(DepositResult result) {

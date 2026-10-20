@@ -1,5 +1,6 @@
 package ElFabrica.Wallet_pay.wallet.service;
 
+import ElFabrica.Wallet_pay.common.money.Money;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
 import ElFabrica.Wallet_pay.transaction.repository.TransactionRepository;
@@ -29,6 +30,71 @@ public class OperationLimitService {
         this.properties = properties;
         this.walletLimitRepository = walletLimitRepository;
         this.transactionRepository = transactionRepository;
+    }
+
+    public WalletLimitsResult describe(UUID walletId, Instant now) {
+        WalletLimitEntity custom = walletLimitRepository.findById(walletId).orElse(null);
+        LimitsProperties.Transfer global = properties.transfer();
+        LimitsProperties.Deposit deposit = properties.deposit();
+        EffectiveTransferLimits effective = effectiveTransferLimits(custom);
+        Optional<LimitPeriods.Window> night = nightWindow(now);
+        Instant dayStart = LimitPeriods.day(now, zone()).start();
+        Instant monthStart = LimitPeriods.month(now, zone()).start();
+
+        BigDecimal dailyUsed = sentTransfers(walletId, dayStart, now);
+        BigDecimal monthlyUsed = sentTransfers(walletId, monthStart, now);
+        BigDecimal nightUsed = night
+                .map(window -> sentTransfers(walletId, window.start(), now))
+                .orElse(BigDecimal.ZERO);
+        BigDecimal depositDailyUsed = receivedDeposits(walletId, dayStart, now);
+
+        return new WalletLimitsResult(
+                new WalletLimitsResult.TransferLimits(
+                        limitValue(effective.perOperation(), global.perOperation(),
+                                customValue(custom, WalletLimitEntity::getTransferPerOperation)),
+                        periodValue(effective.daily(), global.daily(),
+                                customValue(custom, WalletLimitEntity::getTransferDaily), dailyUsed),
+                        periodValue(effective.monthly(), global.monthly(),
+                                customValue(custom, WalletLimitEntity::getTransferMonthly), monthlyUsed),
+                        limitValue(effective.nightPerOperation(), global.nightPerOperation(),
+                                customValue(custom, WalletLimitEntity::getTransferNightPerOperation)),
+                        periodValue(effective.nightWindow(), global.nightWindow(),
+                                customValue(custom, WalletLimitEntity::getTransferNightWindow), nightUsed)
+                ),
+                new WalletLimitsResult.DepositLimits(
+                        limitValue(deposit.perOperation(), deposit.perOperation(), null),
+                        periodValue(deposit.daily(), deposit.daily(), null, depositDailyUsed)
+                ),
+                new WalletLimitsResult.Night(
+                        properties.night().start(),
+                        properties.night().end(),
+                        properties.timezone(),
+                        night.isPresent()
+                )
+        );
+    }
+
+    private static WalletLimitsResult.LimitValue limitValue(BigDecimal effective, BigDecimal global, BigDecimal custom) {
+        return new WalletLimitsResult.LimitValue(
+                Money.format(effective),
+                Money.format(global),
+                custom == null ? null : Money.format(custom)
+        );
+    }
+
+    private static WalletLimitsResult.PeriodLimitValue periodValue(
+            BigDecimal effective,
+            BigDecimal global,
+            BigDecimal custom,
+            BigDecimal used
+    ) {
+        return new WalletLimitsResult.PeriodLimitValue(
+                Money.format(effective),
+                Money.format(global),
+                custom == null ? null : Money.format(custom),
+                Money.format(used),
+                Money.format(effective.subtract(used).max(BigDecimal.ZERO))
+        );
     }
 
     public EffectiveTransferLimits transferLimits(UUID walletId) {

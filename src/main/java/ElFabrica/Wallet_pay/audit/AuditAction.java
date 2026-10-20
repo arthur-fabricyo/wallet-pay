@@ -11,7 +11,8 @@ public enum AuditAction {
     TRANSFER_CREATED(AuditResourceType.TRANSACTION),
     TRANSFER_REJECTED(AuditResourceType.WALLET),
     DEPOSIT_CREATED(AuditResourceType.TRANSACTION),
-    DEPOSIT_REJECTED(AuditResourceType.WALLET);
+    DEPOSIT_REJECTED(AuditResourceType.WALLET),
+    LIMITS_UPDATED(AuditResourceType.WALLET);
 
     private final AuditResourceType resourceType;
 
