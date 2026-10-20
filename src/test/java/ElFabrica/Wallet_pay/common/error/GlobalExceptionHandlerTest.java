@@ -1,11 +1,14 @@
 package ElFabrica.Wallet_pay.common.error;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -13,8 +16,13 @@ import ElFabrica.Wallet_pay.config.SecurityConfig;
 import ElFabrica.Wallet_pay.support.TestJwt;
 import ElFabrica.Wallet_pay.transaction.service.InsufficientBalanceException;
 import ElFabrica.Wallet_pay.user.service.InvalidDocumentException;
+import com.jayway.jsonpath.JsonPath;
+import java.time.Instant;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -22,6 +30,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -146,6 +155,66 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ROUTE_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Rota nao encontrada"));
+    }
+
+    private static final String UUID_PATTERN =
+            "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$";
+
+    @Test
+    void shouldGenerateRequestIdAndEchoItInTheErrorBody() throws Exception {
+        MvcResult result = mockMvc.perform(get("/probe/business").header("Authorization", auth()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(header().string("X-Request-Id", matchesPattern(UUID_PATTERN)))
+                .andReturn();
+
+        String requestId = result.getResponse().getHeader("X-Request-Id");
+        String bodyRequestId = JsonPath.read(result.getResponse().getContentAsString(), "$.requestId");
+        assertThat(bodyRequestId).isEqualTo(requestId);
+    }
+
+    @Test
+    void shouldKeepValidClientRequestId() throws Exception {
+        mockMvc.perform(get("/probe/business")
+                        .header("Authorization", auth())
+                        .header("X-Request-Id", "cliente-123_ABC"))
+                .andExpect(header().string("X-Request-Id", "cliente-123_ABC"))
+                .andExpect(jsonPath("$.requestId").value("cliente-123_ABC"));
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidRequestIds")
+    void shouldReplaceInvalidClientRequestId(String invalidRequestId) throws Exception {
+        mockMvc.perform(get("/probe/business")
+                        .header("Authorization", auth())
+                        .header("X-Request-Id", invalidRequestId))
+                .andExpect(header().string("X-Request-Id", matchesPattern(UUID_PATTERN)));
+    }
+
+    static Stream<String> invalidRequestIds() {
+        return Stream.of("tem espaco", "invalido!", "a".repeat(65));
+    }
+
+    @Test
+    void shouldReturnUnauthorizedAsApiErrorWhenJwtIsMissing() throws Exception {
+        mockMvc.perform(get("/probe/business"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().exists("WWW-Authenticate"))
+                .andExpect(header().exists("X-Request-Id"))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                .andExpect(jsonPath("$.message").value("Token ausente, invalido ou expirado"))
+                .andExpect(jsonPath("$.requestId").exists());
+    }
+
+    @Test
+    void shouldReturnUnauthorizedAsApiErrorWhenJwtIsExpired() throws Exception {
+        String expired = "Bearer " + TestJwt.token(UUID.randomUUID(), Instant.now().minusSeconds(5));
+
+        mockMvc.perform(get("/probe/business").header("Authorization", expired))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("WWW-Authenticate", containsString("invalid_token")))
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 
     @RestController
