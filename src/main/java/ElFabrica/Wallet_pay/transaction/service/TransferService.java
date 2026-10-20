@@ -6,6 +6,7 @@ import ElFabrica.Wallet_pay.audit.AuditLogger;
 import ElFabrica.Wallet_pay.common.error.BusinessException;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotentResult;
 import ElFabrica.Wallet_pay.wallet.service.BalanceConflictException;
+import ElFabrica.Wallet_pay.wallet.service.LimitExceededException;
 import java.util.Map;
 import org.springframework.core.retry.RetryTemplate;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -54,7 +55,8 @@ public class TransferService {
         return AuditEntry.metadata(
                 "amount", command.amount(),
                 "receiverUserId", command.receiverUserId(),
-                "failureCode", exception.getErrorCode()
+                "failureCode", exception.getErrorCode(),
+                "limitType", exception instanceof LimitExceededException limitExceeded ? limitExceeded.getLimitType() : null
         );
     }
 }

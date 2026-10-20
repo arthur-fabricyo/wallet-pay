@@ -14,6 +14,7 @@ import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.repository.TransactionRepository;
 import ElFabrica.Wallet_pay.wallet.domain.WalletEntity;
 import ElFabrica.Wallet_pay.wallet.repository.WalletRepository;
+import ElFabrica.Wallet_pay.wallet.service.OperationLimitService;
 import ElFabrica.Wallet_pay.wallet.service.WalletNotFoundException;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -29,19 +30,22 @@ public class CreateTransferUseCase {
     private final Clock clock;
     private final IdempotencyService idempotencyService;
     private final AuditLogger auditLogger;
+    private final OperationLimitService operationLimitService;
 
     public CreateTransferUseCase(
             WalletRepository walletRepository,
             TransactionRepository transactionRepository,
             Clock clock,
             IdempotencyService idempotencyService,
-            AuditLogger auditLogger
+            AuditLogger auditLogger,
+            OperationLimitService operationLimitService
     ) {
         this.walletRepository = walletRepository;
         this.transactionRepository = transactionRepository;
         this.clock = clock;
         this.idempotencyService = idempotencyService;
         this.auditLogger = auditLogger;
+        this.operationLimitService = operationLimitService;
     }
 
     @Transactional
@@ -77,6 +81,8 @@ public class CreateTransferUseCase {
                 || !WalletEntity.DEFAULT_CURRENCY.equals(receiverWallet.getCurrency())) {
             throw new InvalidTransferException("Moeda da transferencia deve ser BRL");
         }
+
+        operationLimitService.checkTransfer(senderWallet.getId(), amount, now);
 
         if (senderWallet.getBalance().compareTo(amount) < 0) {
             throw new InsufficientBalanceException("Saldo insuficiente");

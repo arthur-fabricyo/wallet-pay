@@ -28,19 +28,22 @@ public class CreateDepositUseCase {
     private final Clock clock;
     private final IdempotencyService idempotencyService;
     private final AuditLogger auditLogger;
+    private final OperationLimitService operationLimitService;
 
     public CreateDepositUseCase(
             WalletRepository walletRepository,
             TransactionRepository transactionRepository,
             Clock clock,
             IdempotencyService idempotencyService,
-            AuditLogger auditLogger
+            AuditLogger auditLogger,
+            OperationLimitService operationLimitService
     ) {
         this.walletRepository = walletRepository;
         this.transactionRepository = transactionRepository;
         this.clock = clock;
         this.idempotencyService = idempotencyService;
         this.auditLogger = auditLogger;
+        this.operationLimitService = operationLimitService;
     }
 
     @Transactional
@@ -66,6 +69,7 @@ public class CreateDepositUseCase {
         WalletEntity wallet = walletRepository.findByUserId(command.userId())
                 .orElseThrow(() -> new WalletNotFoundException("Carteira nao encontrada para o usuario autenticado"));
 
+        operationLimitService.checkDeposit(wallet.getId(), amount, now);
         wallet.credit(amount);
         TransactionEntity transaction = transactionRepository.saveAndFlush(
                 TransactionEntity.completedDeposit(wallet, amount, description, now)

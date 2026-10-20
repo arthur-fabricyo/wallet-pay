@@ -52,7 +52,8 @@ public class DepositService {
     private static Map<String, String> rejectionMetadata(DepositCommand command, BusinessException exception) {
         return AuditEntry.metadata(
                 "amount", command.amount(),
-                "failureCode", exception.getErrorCode()
+                "failureCode", exception.getErrorCode(),
+                "limitType", exception instanceof LimitExceededException limitExceeded ? limitExceeded.getLimitType() : null
         );
     }
 }

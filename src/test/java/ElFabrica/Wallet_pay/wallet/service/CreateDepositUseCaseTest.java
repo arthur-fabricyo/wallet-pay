@@ -8,6 +8,7 @@ import ElFabrica.Wallet_pay.audit.AuditLogger;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotencyService;
 import ElFabrica.Wallet_pay.common.money.InvalidAmountException;
 import ElFabrica.Wallet_pay.support.PassThroughIdempotencyService;
+import ElFabrica.Wallet_pay.support.PermissiveOperationLimitService;
 import ElFabrica.Wallet_pay.support.RecordingAuditLogger;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
@@ -128,7 +129,7 @@ class CreateDepositUseCaseTest {
             IdempotencyService idempotencyService,
             AuditLogger auditLogger
     ) {
-        return new CreateDepositUseCase(walletRepository, transactionRepository, CLOCK, idempotencyService, auditLogger);
+        return new CreateDepositUseCase(walletRepository, transactionRepository, CLOCK, idempotencyService, auditLogger, new PermissiveOperationLimitService());
     }
 
     private static WalletEntity wallet(UUID userId, String balance) {

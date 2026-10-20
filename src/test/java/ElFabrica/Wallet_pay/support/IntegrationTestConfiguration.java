@@ -23,6 +23,12 @@ public class IntegrationTestConfiguration {
 
     @Bean
     @Primary
+    MutableClock mutableClock() {
+        return new MutableClock();
+    }
+
+    @Bean
+    @Primary
     CapturingPasswordRecoverySender capturingPasswordRecoverySender() {
         return new CapturingPasswordRecoverySender();
     }

@@ -43,7 +43,7 @@ class DepositServiceTest {
         private int calls;
 
         FakeCreateDepositUseCase(int failuresBeforeSuccess) {
-            super(null, null, null, null, null);
+            super(null, null, null, null, null, null);
             this.failuresBeforeSuccess = failuresBeforeSuccess;
         }
 

@@ -6,6 +6,9 @@ import ElFabrica.Wallet_pay.user.repository.UserRepository;
 import ElFabrica.Wallet_pay.wallet.domain.WalletEntity;
 import ElFabrica.Wallet_pay.wallet.repository.WalletRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -53,6 +56,20 @@ public abstract class AbstractIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    protected MutableClock clock;
+
+    @BeforeEach
+    void resetClock() {
+        clock.reset();
+    }
+
+    protected Instant useSaoPauloTime(String localDateTime) {
+        Instant instant = LocalDateTime.parse(localDateTime).atZone(ZoneId.of("America/Sao_Paulo")).toInstant();
+        clock.setInstant(instant);
+        return instant;
+    }
 
     @BeforeEach
     void cleanDatabase() {
