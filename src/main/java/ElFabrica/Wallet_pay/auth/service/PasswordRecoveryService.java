@@ -1,5 +1,8 @@
 package ElFabrica.Wallet_pay.auth.service;
 
+import ElFabrica.Wallet_pay.audit.AuditAction;
+import ElFabrica.Wallet_pay.audit.AuditEntry;
+import ElFabrica.Wallet_pay.audit.AuditLogger;
 import ElFabrica.Wallet_pay.common.error.ErrorCode;
 import ElFabrica.Wallet_pay.auth.domain.PasswordResetTokenEntity;
 import ElFabrica.Wallet_pay.auth.repository.PasswordResetTokenRepository;
@@ -10,6 +13,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +31,7 @@ public class PasswordRecoveryService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordRecoverySender passwordRecoverySender;
     private final PasswordEncoder passwordEncoder;
+    private final AuditLogger auditLogger;
     private final SecureRandom secureRandom;
     private final Duration tokenTtl;
 
@@ -37,6 +42,7 @@ public class PasswordRecoveryService {
             RefreshTokenRepository refreshTokenRepository,
             PasswordRecoverySender passwordRecoverySender,
             PasswordEncoder passwordEncoder,
+            AuditLogger auditLogger,
             @Value("${wallet-pay.password-recovery.token-ttl-minutes:30}") long tokenTtlMinutes
     ) {
         this(
@@ -45,6 +51,7 @@ public class PasswordRecoveryService {
                 refreshTokenRepository,
                 passwordRecoverySender,
                 passwordEncoder,
+                auditLogger,
                 new SecureRandom(),
                 Duration.ofMinutes(tokenTtlMinutes)
         );
@@ -56,6 +63,7 @@ public class PasswordRecoveryService {
             RefreshTokenRepository refreshTokenRepository,
             PasswordRecoverySender passwordRecoverySender,
             PasswordEncoder passwordEncoder,
+            AuditLogger auditLogger,
             SecureRandom secureRandom,
             Duration tokenTtl
     ) {
@@ -64,6 +72,7 @@ public class PasswordRecoveryService {
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordRecoverySender = passwordRecoverySender;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogger = auditLogger;
         this.secureRandom = secureRandom;
         this.tokenTtl = tokenTtl;
     }
@@ -99,6 +108,8 @@ public class PasswordRecoveryService {
         user.changePassword(passwordEncoder.encode(newPassword));
         token.markUsed(now);
         refreshTokenRepository.invalidateActiveTokensByUser(user, now);
+        auditLogger.record(AuditEntry.success(AuditAction.PASSWORD_RESET_COMPLETED, user.getId(), Map.of())
+                .withActor(user.getId()));
     }
 
     private void issueFor(UserEntity user) {
@@ -110,6 +121,7 @@ public class PasswordRecoveryService {
                 now.plus(tokenTtl)
         ));
         passwordRecoverySender.sendPasswordRecovery(user.getEmail(), token.getToken());
+        auditLogger.record(AuditEntry.success(AuditAction.PASSWORD_RESET_REQUESTED, user.getId(), Map.of()));
     }
 
     private void validatePassword(String newPassword) {

@@ -1,5 +1,8 @@
 package ElFabrica.Wallet_pay.transaction.service;
 
+import ElFabrica.Wallet_pay.audit.AuditAction;
+import ElFabrica.Wallet_pay.audit.AuditEntry;
+import ElFabrica.Wallet_pay.audit.AuditLogger;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotencyRequest;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotencyService;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotentOperation;
@@ -25,17 +28,20 @@ public class CreateTransferUseCase {
     private final TransactionRepository transactionRepository;
     private final Clock clock;
     private final IdempotencyService idempotencyService;
+    private final AuditLogger auditLogger;
 
     public CreateTransferUseCase(
             WalletRepository walletRepository,
             TransactionRepository transactionRepository,
             Clock clock,
-            IdempotencyService idempotencyService
+            IdempotencyService idempotencyService,
+            AuditLogger auditLogger
     ) {
         this.walletRepository = walletRepository;
         this.transactionRepository = transactionRepository;
         this.clock = clock;
         this.idempotencyService = idempotencyService;
+        this.auditLogger = auditLogger;
     }
 
     @Transactional
@@ -86,6 +92,17 @@ public class CreateTransferUseCase {
                 description,
                 now
         ));
+
+        auditLogger.record(AuditEntry.success(
+                AuditAction.TRANSFER_CREATED,
+                transaction.getId(),
+                AuditEntry.metadata(
+                        "amount", Money.format(amount),
+                        "currency", transaction.getCurrency(),
+                        "senderWalletId", senderWallet.getId(),
+                        "receiverWalletId", receiverWallet.getId()
+                )
+        ).withActor(command.senderUserId()));
 
         return new TransferResult(
                 transaction.getId(),

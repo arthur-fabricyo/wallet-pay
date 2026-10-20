@@ -3,8 +3,11 @@ package ElFabrica.Wallet_pay.auth.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ElFabrica.Wallet_pay.audit.AuditAction;
 import ElFabrica.Wallet_pay.auth.domain.RefreshTokenEntity;
 import ElFabrica.Wallet_pay.auth.repository.RefreshTokenRepository;
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
+import ElFabrica.Wallet_pay.support.RecordingAuditLogger;
 import ElFabrica.Wallet_pay.user.domain.UserEntity;
 import ElFabrica.Wallet_pay.user.repository.UserRepository;
 import java.lang.reflect.Field;
@@ -18,6 +21,51 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 class AuthServiceTest {
 
     @Test
+    void shouldAuditSuccessfulLogin() {
+        UserEntity user = verifiedUser();
+        RecordingAuditLogger auditLogger = new RecordingAuditLogger();
+        AuthService authService = new AuthService(
+                new FakeUserRepository(user).proxy(),
+                new FakeRefreshTokenRepository().proxy(),
+                matchingPasswordEncoder(),
+                fixedAccessTokenService(),
+                auditLogger
+        );
+
+        authService.login("joao@email.com", "Senha123");
+
+        assertThat(auditLogger.recorded).singleElement().satisfies(entry -> {
+            assertThat(entry.action()).isEqualTo(AuditAction.LOGIN_SUCCEEDED);
+            assertThat(entry.actorUserId()).isEqualTo(user.getId());
+        });
+        assertThat(auditLogger.failures).isEmpty();
+    }
+
+    @Test
+    void shouldAuditFailedLoginWithReasonAndWithoutThePassword() {
+        RecordingAuditLogger auditLogger = new RecordingAuditLogger();
+        AuthService authService = new AuthService(
+                new FakeUserRepository(verifiedUser()).proxy(),
+                new FakeRefreshTokenRepository().proxy(),
+                nonMatchingPasswordEncoder(),
+                fixedAccessTokenService(),
+                auditLogger
+        );
+
+        assertThatThrownBy(() -> authService.login("JOAO@EMAIL.COM", "errada"))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        assertThat(auditLogger.failures).singleElement().satisfies(entry -> {
+            assertThat(entry.action()).isEqualTo(AuditAction.LOGIN_FAILED);
+            assertThat(entry.failureCode()).isEqualTo(ErrorCode.INVALID_CREDENTIALS);
+            assertThat(entry.metadata())
+                    .containsEntry("email", "joao@email.com")
+                    .containsEntry("reason", "INVALID_CREDENTIALS")
+                    .doesNotContainValue("errada");
+        });
+    }
+
+    @Test
     void shouldAuthenticateVerifiedUserWithNormalizedEmailAndPersistRefreshToken() {
         UserEntity user = verifiedUser();
         FakeUserRepository userRepository = new FakeUserRepository(user);
@@ -26,7 +74,8 @@ class AuthServiceTest {
                 userRepository.proxy(),
                 refreshTokenRepository.proxy(),
                 matchingPasswordEncoder(),
-                fixedAccessTokenService()
+                fixedAccessTokenService(),
+                new RecordingAuditLogger()
         );
 
         AuthTokenResult result = authService.login("JOAO@EMAIL.COM", "Senha123");
@@ -45,7 +94,8 @@ class AuthServiceTest {
                 new FakeUserRepository(verifiedUser()).proxy(),
                 new FakeRefreshTokenRepository().proxy(),
                 nonMatchingPasswordEncoder(),
-                fixedAccessTokenService()
+                fixedAccessTokenService(),
+                new RecordingAuditLogger()
         );
 
         assertThatThrownBy(() -> authService.login("joao@email.com", "errada"))
@@ -58,7 +108,8 @@ class AuthServiceTest {
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository().proxy(),
                 matchingPasswordEncoder(),
-                fixedAccessTokenService()
+                fixedAccessTokenService(),
+                new RecordingAuditLogger()
         );
 
         assertThatThrownBy(() -> authService.login("naoexiste@email.com", "Senha123"))
@@ -71,7 +122,8 @@ class AuthServiceTest {
                 new FakeUserRepository(unverifiedUser()).proxy(),
                 new FakeRefreshTokenRepository().proxy(),
                 matchingPasswordEncoder(),
-                fixedAccessTokenService()
+                fixedAccessTokenService(),
+                new RecordingAuditLogger()
         );
 
         assertThatThrownBy(() -> authService.login("joao@email.com", "Senha123"))
@@ -89,7 +141,8 @@ class AuthServiceTest {
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository(refreshToken).proxy(),
                 matchingPasswordEncoder(),
-                fixedAccessTokenService()
+                fixedAccessTokenService(),
+                new RecordingAuditLogger()
         );
 
         AccessTokenResult result = authService.refresh("refresh-token");
@@ -109,7 +162,8 @@ class AuthServiceTest {
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository(refreshToken).proxy(),
                 matchingPasswordEncoder(),
-                fixedAccessTokenService()
+                fixedAccessTokenService(),
+                new RecordingAuditLogger()
         );
 
         assertThatThrownBy(() -> authService.refresh("refresh-token"))
@@ -122,7 +176,8 @@ class AuthServiceTest {
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository(null).proxy(),
                 matchingPasswordEncoder(),
-                fixedAccessTokenService()
+                fixedAccessTokenService(),
+                new RecordingAuditLogger()
         );
 
         assertThatThrownBy(() -> authService.refresh("missing-token"))
@@ -141,7 +196,8 @@ class AuthServiceTest {
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository(refreshToken).proxy(),
                 matchingPasswordEncoder(),
-                fixedAccessTokenService()
+                fixedAccessTokenService(),
+                new RecordingAuditLogger()
         );
 
         assertThatThrownBy(() -> authService.refresh("refresh-token"))
@@ -159,7 +215,8 @@ class AuthServiceTest {
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository(refreshToken).proxy(),
                 matchingPasswordEncoder(),
-                fixedAccessTokenService()
+                fixedAccessTokenService(),
+                new RecordingAuditLogger()
         );
 
         authService.logout("refresh-token");

@@ -3,9 +3,12 @@ package ElFabrica.Wallet_pay.wallet.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ElFabrica.Wallet_pay.audit.AuditAction;
+import ElFabrica.Wallet_pay.audit.AuditLogger;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotencyService;
 import ElFabrica.Wallet_pay.common.money.InvalidAmountException;
 import ElFabrica.Wallet_pay.support.PassThroughIdempotencyService;
+import ElFabrica.Wallet_pay.support.RecordingAuditLogger;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
@@ -56,6 +59,32 @@ class CreateDepositUseCaseTest {
     }
 
     @Test
+    void shouldRecordDepositCreatedInTheSameTransaction() {
+        UUID userId = UUID.randomUUID();
+        WalletEntity wallet = wallet(userId, "100.00");
+        FakeTransactionRepository transactionRepository = new FakeTransactionRepository();
+        RecordingAuditLogger auditLogger = new RecordingAuditLogger();
+        CreateDepositUseCase useCase = useCase(
+                new FakeWalletRepository(wallet).proxy(),
+                transactionRepository.proxy(),
+                new PassThroughIdempotencyService(),
+                auditLogger
+        );
+
+        useCase.deposit(new DepositCommand(userId, "15.50", null, "chave-1"));
+
+        assertThat(auditLogger.recorded).singleElement().satisfies(entry -> {
+            assertThat(entry.action()).isEqualTo(AuditAction.DEPOSIT_CREATED);
+            assertThat(entry.resourceId()).isEqualTo(transactionRepository.transactionId);
+            assertThat(entry.actorUserId()).isEqualTo(userId);
+            assertThat(entry.metadata())
+                    .containsEntry("amount", "15.50")
+                    .containsEntry("currency", "BRL")
+                    .containsEntry("walletId", wallet.getId().toString());
+        });
+    }
+
+    @Test
     void shouldRejectInvalidAmountWithoutTouchingWallet() {
         UUID userId = UUID.randomUUID();
         WalletEntity wallet = wallet(userId, "100.00");
@@ -90,7 +119,16 @@ class CreateDepositUseCaseTest {
             TransactionRepository transactionRepository,
             IdempotencyService idempotencyService
     ) {
-        return new CreateDepositUseCase(walletRepository, transactionRepository, CLOCK, idempotencyService);
+        return useCase(walletRepository, transactionRepository, idempotencyService, new RecordingAuditLogger());
+    }
+
+    private static CreateDepositUseCase useCase(
+            WalletRepository walletRepository,
+            TransactionRepository transactionRepository,
+            IdempotencyService idempotencyService,
+            AuditLogger auditLogger
+    ) {
+        return new CreateDepositUseCase(walletRepository, transactionRepository, CLOCK, idempotencyService, auditLogger);
     }
 
     private static WalletEntity wallet(UUID userId, String balance) {

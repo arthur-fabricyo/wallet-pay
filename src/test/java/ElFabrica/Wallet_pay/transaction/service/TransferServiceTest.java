@@ -3,8 +3,11 @@ package ElFabrica.Wallet_pay.transaction.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ElFabrica.Wallet_pay.audit.AuditAction;
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotentResult;
 import ElFabrica.Wallet_pay.config.ResilienceConfig;
+import ElFabrica.Wallet_pay.support.RecordingAuditLogger;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
 import ElFabrica.Wallet_pay.wallet.service.BalanceConflictException;
@@ -24,9 +27,29 @@ class TransferServiceTest {
     );
 
     @Test
+    void shouldAuditTheRejectionOnceAfterTheLastAttempt() {
+        RecordingAuditLogger auditLogger = new RecordingAuditLogger();
+        FakeCreateTransferUseCase useCase = new FakeCreateTransferUseCase(Integer.MAX_VALUE);
+        TransferService service = new TransferService(new ResilienceConfig().balanceRetryTemplate(), useCase, auditLogger);
+
+        assertThatThrownBy(() -> service.transfer(COMMAND)).isInstanceOf(BalanceConflictException.class);
+
+        assertThat(useCase.calls).isEqualTo(4);
+        assertThat(auditLogger.failures).singleElement().satisfies(entry -> {
+            assertThat(entry.action()).isEqualTo(AuditAction.TRANSFER_REJECTED);
+            assertThat(entry.failureCode()).isEqualTo(ErrorCode.BALANCE_CONFLICT);
+            assertThat(entry.actorUserId()).isEqualTo(COMMAND.senderUserId());
+            assertThat(entry.metadata())
+                    .containsEntry("amount", "10.00")
+                    .containsEntry("receiverUserId", COMMAND.receiverUserId().toString())
+                    .containsEntry("failureCode", "BALANCE_CONFLICT");
+        });
+    }
+
+    @Test
     void shouldRetryOptimisticLockingFailuresUntilSuccess() {
         FakeCreateTransferUseCase useCase = new FakeCreateTransferUseCase(2);
-        TransferService service = new TransferService(new ResilienceConfig().balanceRetryTemplate(), useCase);
+        TransferService service = new TransferService(new ResilienceConfig().balanceRetryTemplate(), useCase, new RecordingAuditLogger());
 
         IdempotentResult<TransferResult> outcome = service.transfer(COMMAND);
 
@@ -37,7 +60,7 @@ class TransferServiceTest {
     @Test
     void shouldGiveUpAfterFourCallsWithBalanceConflict() {
         FakeCreateTransferUseCase useCase = new FakeCreateTransferUseCase(Integer.MAX_VALUE);
-        TransferService service = new TransferService(new ResilienceConfig().balanceRetryTemplate(), useCase);
+        TransferService service = new TransferService(new ResilienceConfig().balanceRetryTemplate(), useCase, new RecordingAuditLogger());
 
         assertThatThrownBy(() -> service.transfer(COMMAND))
                 .isInstanceOf(BalanceConflictException.class)
@@ -49,7 +72,7 @@ class TransferServiceTest {
     void shouldNotRetryBusinessErrors() {
         FakeCreateTransferUseCase useCase = new FakeCreateTransferUseCase(0);
         useCase.businessError = new InsufficientBalanceException("Saldo insuficiente");
-        TransferService service = new TransferService(new ResilienceConfig().balanceRetryTemplate(), useCase);
+        TransferService service = new TransferService(new ResilienceConfig().balanceRetryTemplate(), useCase, new RecordingAuditLogger());
 
         assertThatThrownBy(() -> service.transfer(COMMAND))
                 .isInstanceOf(InsufficientBalanceException.class);
@@ -75,7 +98,7 @@ class TransferServiceTest {
         private int calls;
 
         FakeCreateTransferUseCase(int failuresBeforeSuccess) {
-            super(null, null, null, null);
+            super(null, null, null, null, null);
             this.failuresBeforeSuccess = failuresBeforeSuccess;
         }
 

@@ -365,7 +365,7 @@ class TransactionControllerTest {
         private RuntimeException exception;
 
         FakeTransferService() {
-            super(null, null);
+            super(null, null, null);
         }
 
         @Override

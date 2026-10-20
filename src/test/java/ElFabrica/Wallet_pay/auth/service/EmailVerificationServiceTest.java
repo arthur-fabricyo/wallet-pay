@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ElFabrica.Wallet_pay.auth.domain.EmailVerificationTokenEntity;
 import ElFabrica.Wallet_pay.auth.repository.EmailVerificationTokenRepository;
+import ElFabrica.Wallet_pay.support.RecordingAuditLogger;
 import ElFabrica.Wallet_pay.user.domain.UserEntity;
 import ElFabrica.Wallet_pay.user.repository.UserRepository;
 import java.lang.reflect.Field;
@@ -156,6 +157,7 @@ class EmailVerificationServiceTest {
                 tokenRepository.proxy(),
                 userRepository.proxy(),
                 tokenRepository.sender,
+                new RecordingAuditLogger(),
                 new SecureRandom(),
                 Duration.ofHours(24)
         );

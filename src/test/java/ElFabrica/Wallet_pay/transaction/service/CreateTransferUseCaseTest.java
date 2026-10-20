@@ -3,11 +3,14 @@ package ElFabrica.Wallet_pay.transaction.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ElFabrica.Wallet_pay.audit.AuditAction;
+import ElFabrica.Wallet_pay.audit.AuditLogger;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotencyService;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotentOperation;
 import ElFabrica.Wallet_pay.common.idempotency.RequestHash;
 import ElFabrica.Wallet_pay.common.money.InvalidAmountException;
 import ElFabrica.Wallet_pay.support.PassThroughIdempotencyService;
+import ElFabrica.Wallet_pay.support.RecordingAuditLogger;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
@@ -44,7 +47,16 @@ class CreateTransferUseCaseTest {
             TransactionRepository transactionRepository,
             IdempotencyService idempotencyService
     ) {
-        return new CreateTransferUseCase(walletRepository, transactionRepository, CLOCK, idempotencyService);
+        return useCase(walletRepository, transactionRepository, idempotencyService, new RecordingAuditLogger());
+    }
+
+    private static CreateTransferUseCase useCase(
+            WalletRepository walletRepository,
+            TransactionRepository transactionRepository,
+            IdempotencyService idempotencyService,
+            AuditLogger auditLogger
+    ) {
+        return new CreateTransferUseCase(walletRepository, transactionRepository, CLOCK, idempotencyService, auditLogger);
     }
 
     @Test
@@ -115,6 +127,39 @@ class CreateTransferUseCaseTest {
         assertThat(result.createdAt()).isNotNull();
         assertThat(result.completedAt()).isNotNull();
         assertThat(transactionRepository.savedTransaction.getCreatedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void shouldRecordTransferCreatedInTheSameTransaction() {
+        UUID senderUserId = UUID.randomUUID();
+        UUID receiverUserId = UUID.randomUUID();
+        UUID senderWalletId = UUID.randomUUID();
+        UUID receiverWalletId = UUID.randomUUID();
+        FakeWalletRepository walletRepository = new FakeWalletRepository(Map.of(
+                senderUserId, wallet(senderUserId, senderWalletId, "100.00"),
+                receiverUserId, wallet(receiverUserId, receiverWalletId, "10.00")
+        ));
+        FakeTransactionRepository transactionRepository = new FakeTransactionRepository();
+        RecordingAuditLogger auditLogger = new RecordingAuditLogger();
+        CreateTransferUseCase useCase = useCase(
+                walletRepository.proxy(),
+                transactionRepository.proxy(),
+                new PassThroughIdempotencyService(),
+                auditLogger
+        );
+
+        useCase.transfer(new TransferCommand(senderUserId, receiverUserId, "25.50", null, "chave-1"));
+
+        assertThat(auditLogger.recorded).singleElement().satisfies(entry -> {
+            assertThat(entry.action()).isEqualTo(AuditAction.TRANSFER_CREATED);
+            assertThat(entry.resourceId()).isEqualTo(transactionRepository.transactionId);
+            assertThat(entry.actorUserId()).isEqualTo(senderUserId);
+            assertThat(entry.metadata())
+                    .containsEntry("amount", "25.50")
+                    .containsEntry("currency", "BRL")
+                    .containsEntry("senderWalletId", senderWalletId.toString())
+                    .containsEntry("receiverWalletId", receiverWalletId.toString());
+        });
     }
 
     @Test

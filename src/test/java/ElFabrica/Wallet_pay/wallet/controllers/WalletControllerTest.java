@@ -375,7 +375,7 @@ class WalletControllerTest {
         private RuntimeException exception;
 
         FakeDepositService() {
-            super(null, null);
+            super(null, null, null);
         }
 
         @Override

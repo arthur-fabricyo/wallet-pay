@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ElFabrica.Wallet_pay.auth.service.EmailVerificationTokenIssuer;
+import ElFabrica.Wallet_pay.support.RecordingAuditLogger;
 import ElFabrica.Wallet_pay.user.domain.UserEntity;
 import ElFabrica.Wallet_pay.user.repository.UserRepository;
 import ElFabrica.Wallet_pay.wallet.domain.WalletEntity;
@@ -27,7 +28,8 @@ class RegisterUserUseCaseTest {
                 walletRepository.proxy(),
                 passwordEncoder,
                 cnpjValidatorGateway,
-                emailVerificationTokenIssuer
+                emailVerificationTokenIssuer,
+                new RecordingAuditLogger()
         );
 
         useCase.register(new RegisterUserCommand(
@@ -59,7 +61,8 @@ class RegisterUserUseCaseTest {
                 fixedPasswordEncoder(),
                 cnpj -> false,
                 user -> {
-                }
+                },
+                new RecordingAuditLogger()
         );
 
         assertThatThrownBy(() -> useCase.register(new RegisterUserCommand(
@@ -84,7 +87,8 @@ class RegisterUserUseCaseTest {
                 fixedPasswordEncoder(),
                 cnpjValidatorGateway,
                 user -> {
-                }
+                },
+                new RecordingAuditLogger()
         );
 
         assertThatThrownBy(() -> useCase.register(new RegisterUserCommand(

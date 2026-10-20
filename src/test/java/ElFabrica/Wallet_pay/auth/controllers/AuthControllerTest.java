@@ -324,7 +324,7 @@ class AuthControllerTest {
         private String logoutToken;
 
         FakeAuthService() {
-            super(null, null, null, null);
+            super(null, null, null, null, null);
         }
 
         @Override
@@ -368,7 +368,7 @@ class AuthControllerTest {
         private RuntimeException confirmException;
 
         FakeEmailVerificationService() {
-            super(null, null, null, 24);
+            super(null, null, null, null, 24);
         }
 
         @Override
@@ -399,7 +399,7 @@ class AuthControllerTest {
         private RuntimeException resetException;
 
         FakePasswordRecoveryService() {
-            super(null, null, null, null, null, 30);
+            super(null, null, null, null, null, null, 30);
         }
 
         @Override

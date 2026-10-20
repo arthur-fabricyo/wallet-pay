@@ -1,5 +1,8 @@
 package ElFabrica.Wallet_pay.wallet.service;
 
+import ElFabrica.Wallet_pay.audit.AuditAction;
+import ElFabrica.Wallet_pay.audit.AuditEntry;
+import ElFabrica.Wallet_pay.audit.AuditLogger;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotencyRequest;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotencyService;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotentOperation;
@@ -24,17 +27,20 @@ public class CreateDepositUseCase {
     private final TransactionRepository transactionRepository;
     private final Clock clock;
     private final IdempotencyService idempotencyService;
+    private final AuditLogger auditLogger;
 
     public CreateDepositUseCase(
             WalletRepository walletRepository,
             TransactionRepository transactionRepository,
             Clock clock,
-            IdempotencyService idempotencyService
+            IdempotencyService idempotencyService,
+            AuditLogger auditLogger
     ) {
         this.walletRepository = walletRepository;
         this.transactionRepository = transactionRepository;
         this.clock = clock;
         this.idempotencyService = idempotencyService;
+        this.auditLogger = auditLogger;
     }
 
     @Transactional
@@ -64,6 +70,16 @@ public class CreateDepositUseCase {
         TransactionEntity transaction = transactionRepository.saveAndFlush(
                 TransactionEntity.completedDeposit(wallet, amount, description, now)
         );
+
+        auditLogger.record(AuditEntry.success(
+                AuditAction.DEPOSIT_CREATED,
+                transaction.getId(),
+                AuditEntry.metadata(
+                        "amount", Money.format(amount),
+                        "currency", transaction.getCurrency(),
+                        "walletId", wallet.getId()
+                )
+        ).withActor(command.userId()));
 
         return new DepositResult(
                 transaction.getId(),

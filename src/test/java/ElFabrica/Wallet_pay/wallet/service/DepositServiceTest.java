@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ElFabrica.Wallet_pay.common.idempotency.IdempotentResult;
 import ElFabrica.Wallet_pay.config.ResilienceConfig;
+import ElFabrica.Wallet_pay.support.RecordingAuditLogger;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -16,7 +17,7 @@ class DepositServiceTest {
     @Test
     void shouldRetryAndThenReturnTheDeposit() {
         FakeCreateDepositUseCase useCase = new FakeCreateDepositUseCase(1);
-        DepositService service = new DepositService(new ResilienceConfig().balanceRetryTemplate(), useCase);
+        DepositService service = new DepositService(new ResilienceConfig().balanceRetryTemplate(), useCase, new RecordingAuditLogger());
 
         assertThat(service.deposit(COMMAND).result()).isSameAs(useCase.result);
         assertThat(useCase.calls).isEqualTo(2);
@@ -25,7 +26,7 @@ class DepositServiceTest {
     @Test
     void shouldTranslateExhaustedRetriesIntoBalanceConflict() {
         FakeCreateDepositUseCase useCase = new FakeCreateDepositUseCase(Integer.MAX_VALUE);
-        DepositService service = new DepositService(new ResilienceConfig().balanceRetryTemplate(), useCase);
+        DepositService service = new DepositService(new ResilienceConfig().balanceRetryTemplate(), useCase, new RecordingAuditLogger());
 
         assertThatThrownBy(() -> service.deposit(COMMAND))
                 .isInstanceOf(BalanceConflictException.class)
@@ -42,7 +43,7 @@ class DepositServiceTest {
         private int calls;
 
         FakeCreateDepositUseCase(int failuresBeforeSuccess) {
-            super(null, null, null, null);
+            super(null, null, null, null, null);
             this.failuresBeforeSuccess = failuresBeforeSuccess;
         }
 
