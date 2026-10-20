@@ -3,6 +3,7 @@ package ElFabrica.Wallet_pay.transaction.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ElFabrica.Wallet_pay.common.money.InvalidAmountException;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
@@ -82,7 +83,8 @@ class CreateTransferUseCaseTest {
                 receiverUserId,
                 "10.123",
                 null
-        ))).isInstanceOf(InvalidTransferException.class);
+        ))).isInstanceOf(InvalidAmountException.class)
+                .hasMessage("Valor deve ter no maximo duas casas decimais");
 
         assertThat(transactionRepository.savedTransaction).isNull();
     }
