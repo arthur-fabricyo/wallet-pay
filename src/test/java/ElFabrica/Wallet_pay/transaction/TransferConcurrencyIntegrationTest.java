@@ -36,6 +36,26 @@ class TransferConcurrencyIntegrationTest extends AbstractIntegrationTest {
         assertThat(jdbcTemplate.queryForObject("select count(*) from transactions", Long.class)).isEqualTo(10L);
     }
 
+    @Test
+    void shouldNeverFailWithServerErrorWhenTransfersCrossInOppositeDirections() throws Exception {
+        TestUser first = createVerifiedUser("Joao Silva", "1000.00");
+        TestUser second = createVerifiedUser("Maria Souza", "1000.00");
+        BigDecimal totalBefore = totalBalance();
+        java.util.concurrent.atomic.AtomicInteger counter = new java.util.concurrent.atomic.AtomicInteger();
+
+        List<String> outcomes = runConcurrently(40, () -> counter.getAndIncrement() % 2 == 0
+                ? transferAsClient(first, second, "10.00")
+                : transferAsClient(second, first, "10.00"));
+
+        // transferAsClient only returns SUCCESS or INSUFFICIENT_BALANCE; any deadlock (CannotAcquireLockException) propagates and fails the test
+        assertThat(outcomes).containsOnly("SUCCESS");
+        assertThat(balanceOf(first).add(balanceOf(second))).isEqualByComparingTo("2000.00");
+        assertThat(balanceOf(first)).isEqualByComparingTo("1000.00");
+        assertThat(totalBalance()).isEqualByComparingTo(totalBefore);
+        assertThat(jdbcTemplate.queryForObject("select count(*) from wallets where balance < 0", Long.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("select count(*) from transactions", Long.class)).isEqualTo(40L);
+    }
+
     private String transferAsClient(TestUser sender, TestUser receiver, String amount) {
         String idempotencyKey = UUID.randomUUID().toString();
         for (int attempt = 0; attempt < 50; attempt++) {
