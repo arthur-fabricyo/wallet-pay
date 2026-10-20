@@ -3,6 +3,7 @@ package ElFabrica.Wallet_pay.wallet.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ElFabrica.Wallet_pay.common.idempotency.IdempotentResult;
 import ElFabrica.Wallet_pay.config.ResilienceConfig;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -10,14 +11,14 @@ import org.springframework.dao.OptimisticLockingFailureException;
 
 class DepositServiceTest {
 
-    private static final DepositCommand COMMAND = new DepositCommand(UUID.randomUUID(), "10.00", null);
+    private static final DepositCommand COMMAND = new DepositCommand(UUID.randomUUID(), "10.00", null, "chave-1");
 
     @Test
     void shouldRetryAndThenReturnTheDeposit() {
         FakeCreateDepositUseCase useCase = new FakeCreateDepositUseCase(1);
         DepositService service = new DepositService(new ResilienceConfig().balanceRetryTemplate(), useCase);
 
-        assertThat(service.deposit(COMMAND)).isSameAs(useCase.result);
+        assertThat(service.deposit(COMMAND).result()).isSameAs(useCase.result);
         assertThat(useCase.calls).isEqualTo(2);
     }
 
@@ -41,17 +42,17 @@ class DepositServiceTest {
         private int calls;
 
         FakeCreateDepositUseCase(int failuresBeforeSuccess) {
-            super(null, null, null);
+            super(null, null, null, null);
             this.failuresBeforeSuccess = failuresBeforeSuccess;
         }
 
         @Override
-        public DepositResult deposit(DepositCommand command) {
+        public IdempotentResult<DepositResult> deposit(DepositCommand command) {
             calls++;
             if (calls <= failuresBeforeSuccess) {
                 throw new OptimisticLockingFailureException("versao da carteira mudou");
             }
-            return result;
+            return new IdempotentResult<>(result, false);
         }
     }
 }

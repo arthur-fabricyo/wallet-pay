@@ -1,5 +1,6 @@
 package ElFabrica.Wallet_pay.wallet.service;
 
+import ElFabrica.Wallet_pay.common.idempotency.IdempotentResult;
 import org.springframework.core.retry.RetryTemplate;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -15,7 +16,7 @@ public class DepositService {
         this.createDepositUseCase = createDepositUseCase;
     }
 
-    public DepositResult deposit(DepositCommand command) {
+    public IdempotentResult<DepositResult> deposit(DepositCommand command) {
         try {
             return balanceRetryTemplate.invoke(() -> createDepositUseCase.deposit(command));
         } catch (OptimisticLockingFailureException exception) {

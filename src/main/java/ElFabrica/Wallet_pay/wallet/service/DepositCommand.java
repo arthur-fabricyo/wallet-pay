@@ -5,6 +5,7 @@ import java.util.UUID;
 public record DepositCommand(
         UUID userId,
         String amount,
-        String description
+        String description,
+        String idempotencyKey
 ) {
 }

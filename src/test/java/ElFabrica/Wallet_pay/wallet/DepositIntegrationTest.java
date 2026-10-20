@@ -39,7 +39,7 @@ class DepositIntegrationTest extends AbstractIntegrationTest {
     void shouldCreditOwnWalletAndRegisterDepositTransaction() throws Exception {
         TestUser user = createVerifiedUser("Joao Silva", "100.00");
 
-        mockMvc.perform(post("/wallets/me/deposits")
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", UUID.randomUUID().toString())
                         .header("Authorization", bearer(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -67,7 +67,7 @@ class DepositIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void shouldRejectDepositWithoutJwt() throws Exception {
-        mockMvc.perform(post("/wallets/me/deposits")
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -82,7 +82,7 @@ class DepositIntegrationTest extends AbstractIntegrationTest {
     void shouldRejectInvalidAmountWithoutChangingBalance(String amount) throws Exception {
         TestUser user = createVerifiedUser("Joao Silva", "100.00");
 
-        mockMvc.perform(post("/wallets/me/deposits")
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", UUID.randomUUID().toString())
                         .header("Authorization", bearer(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -101,7 +101,7 @@ class DepositIntegrationTest extends AbstractIntegrationTest {
     void shouldRejectMissingAmountWithInvalidAmountCode() throws Exception {
         TestUser user = createVerifiedUser("Joao Silva", "0.00");
 
-        mockMvc.perform(post("/wallets/me/deposits")
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", UUID.randomUUID().toString())
                         .header("Authorization", bearer(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -137,8 +137,8 @@ class DepositIntegrationTest extends AbstractIntegrationTest {
     void shouldListDepositInStatementAndFilterByType() throws Exception {
         TestUser user = createVerifiedUser("Joao Silva", "0.00");
         TestUser other = createVerifiedUser("Maria Souza", "50.00");
-        depositService.deposit(new DepositCommand(user.userId(), "150.00", "Aporte"));
-        transferService.transfer(new TransferCommand(other.userId(), user.userId(), "20.00", null));
+        depositService.deposit(new DepositCommand(user.userId(), "150.00", "Aporte", UUID.randomUUID().toString()));
+        transferService.transfer(new TransferCommand(other.userId(), user.userId(), "20.00", null, UUID.randomUUID().toString()));
 
         mockMvc.perform(get("/wallets/me/statement").header("Authorization", bearer(user)))
                 .andExpect(status().isOk())
@@ -156,7 +156,7 @@ class DepositIntegrationTest extends AbstractIntegrationTest {
     @Test
     void shouldRefuseReceiptForDeposit() throws Exception {
         TestUser user = createVerifiedUser("Joao Silva", "0.00");
-        String body = mockMvc.perform(post("/wallets/me/deposits")
+        String body = mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", UUID.randomUUID().toString())
                         .header("Authorization", bearer(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -187,9 +187,10 @@ class DepositIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String depositAsClient(TestUser user, String amount) {
+        String idempotencyKey = UUID.randomUUID().toString();
         for (int attempt = 0; attempt < 50; attempt++) {
             try {
-                depositService.deposit(new DepositCommand(user.userId(), amount, null));
+                depositService.deposit(new DepositCommand(user.userId(), amount, null, idempotencyKey));
                 return "SUCCESS";
             } catch (BalanceConflictException exception) {
                 // o cliente repete depois de 409 BALANCE_CONFLICT

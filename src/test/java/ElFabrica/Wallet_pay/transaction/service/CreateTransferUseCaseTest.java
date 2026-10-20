@@ -3,7 +3,11 @@ package ElFabrica.Wallet_pay.transaction.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ElFabrica.Wallet_pay.common.idempotency.IdempotencyService;
+import ElFabrica.Wallet_pay.common.idempotency.IdempotentOperation;
+import ElFabrica.Wallet_pay.common.idempotency.RequestHash;
 import ElFabrica.Wallet_pay.common.money.InvalidAmountException;
+import ElFabrica.Wallet_pay.support.PassThroughIdempotencyService;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
@@ -32,7 +36,39 @@ class CreateTransferUseCaseTest {
             WalletRepository walletRepository,
             TransactionRepository transactionRepository
     ) {
-        return new CreateTransferUseCase(walletRepository, transactionRepository, CLOCK);
+        return useCase(walletRepository, transactionRepository, new PassThroughIdempotencyService());
+    }
+
+    private static CreateTransferUseCase useCase(
+            WalletRepository walletRepository,
+            TransactionRepository transactionRepository,
+            IdempotencyService idempotencyService
+    ) {
+        return new CreateTransferUseCase(walletRepository, transactionRepository, CLOCK, idempotencyService);
+    }
+
+    @Test
+    void shouldProtectTransferWithIdempotencyKeyAndNormalizedHash() {
+        UUID senderUserId = UUID.randomUUID();
+        UUID receiverUserId = UUID.randomUUID();
+        FakeWalletRepository walletRepository = new FakeWalletRepository(Map.of(
+                senderUserId, wallet(senderUserId, UUID.randomUUID(), "100.00"),
+                receiverUserId, wallet(receiverUserId, UUID.randomUUID(), "10.00")
+        ));
+        PassThroughIdempotencyService idempotencyService = new PassThroughIdempotencyService();
+        CreateTransferUseCase useCase = useCase(
+                walletRepository.proxy(),
+                new FakeTransactionRepository().proxy(),
+                idempotencyService
+        );
+
+        useCase.transfer(new TransferCommand(senderUserId, receiverUserId, "25.5", " Almoco ", "chave-1"));
+
+        assertThat(idempotencyService.lastRequest.userId()).isEqualTo(senderUserId);
+        assertThat(idempotencyService.lastRequest.operation()).isEqualTo(IdempotentOperation.TRANSFER_CREATE);
+        assertThat(idempotencyService.lastRequest.key()).isEqualTo("chave-1");
+        assertThat(idempotencyService.lastRequest.requestHash())
+                .isEqualTo(RequestHash.of(receiverUserId.toString(), "25.50", "Almoco"));
     }
 
     @Test
@@ -57,8 +93,9 @@ class CreateTransferUseCaseTest {
                 senderUserId,
                 receiverUserId,
                 "25.50",
-                " Almoco "
-        ));
+                " Almoco ",
+                "chave-1"
+        )).result();
 
         assertThat(senderWallet.getBalance()).isEqualByComparingTo("74.50");
         assertThat(receiverWallet.getBalance()).isEqualByComparingTo("35.50");
@@ -95,7 +132,8 @@ class CreateTransferUseCaseTest {
                 senderUserId,
                 receiverUserId,
                 "10.123",
-                null
+                null,
+                "chave-1"
         ))).isInstanceOf(InvalidAmountException.class)
                 .hasMessage("Valor deve ter no maximo duas casas decimais");
 
@@ -118,7 +156,8 @@ class CreateTransferUseCaseTest {
                 senderUserId,
                 receiverUserId,
                 "25.50",
-                null
+                null,
+                "chave-1"
         ))).isInstanceOf(InsufficientBalanceException.class);
 
         assertThat(senderWallet.getBalance()).isEqualByComparingTo("20.00");
@@ -139,7 +178,8 @@ class CreateTransferUseCaseTest {
                 userId,
                 userId,
                 "10.00",
-                null
+                null,
+                "chave-1"
         ))).isInstanceOf(InvalidTransferException.class);
 
         assertThat(walletRepository.findByUserIdCalls).isEqualTo(0);

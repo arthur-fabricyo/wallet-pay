@@ -3,7 +3,9 @@ package ElFabrica.Wallet_pay.wallet.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ElFabrica.Wallet_pay.common.idempotency.IdempotencyService;
 import ElFabrica.Wallet_pay.common.money.InvalidAmountException;
+import ElFabrica.Wallet_pay.support.PassThroughIdempotencyService;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
@@ -33,7 +35,7 @@ class CreateDepositUseCaseTest {
         FakeTransactionRepository transactionRepository = new FakeTransactionRepository();
         CreateDepositUseCase useCase = useCase(new FakeWalletRepository(wallet).proxy(), transactionRepository.proxy());
 
-        DepositResult result = useCase.deposit(new DepositCommand(userId, "150", "  Aporte inicial "));
+        DepositResult result = useCase.deposit(new DepositCommand(userId, "150", "  Aporte inicial ", "chave-1")).result();
 
         assertThat(wallet.getBalance()).isEqualByComparingTo("250.00");
         TransactionEntity saved = transactionRepository.savedTransaction;
@@ -60,7 +62,7 @@ class CreateDepositUseCaseTest {
         FakeTransactionRepository transactionRepository = new FakeTransactionRepository();
         CreateDepositUseCase useCase = useCase(new FakeWalletRepository(wallet).proxy(), transactionRepository.proxy());
 
-        assertThatThrownBy(() -> useCase.deposit(new DepositCommand(userId, "0", null)))
+        assertThatThrownBy(() -> useCase.deposit(new DepositCommand(userId, "0", null, "chave-1")))
                 .isInstanceOf(InvalidAmountException.class)
                 .hasMessage("Valor deve ser maior que zero");
         assertThat(wallet.getBalance()).isEqualByComparingTo("100.00");
@@ -74,13 +76,21 @@ class CreateDepositUseCaseTest {
                 new FakeTransactionRepository().proxy()
         );
 
-        assertThatThrownBy(() -> useCase.deposit(new DepositCommand(UUID.randomUUID(), "10.00", null)))
+        assertThatThrownBy(() -> useCase.deposit(new DepositCommand(UUID.randomUUID(), "10.00", null, "chave-1")))
                 .isInstanceOf(WalletNotFoundException.class)
                 .hasMessage("Carteira nao encontrada para o usuario autenticado");
     }
 
     private static CreateDepositUseCase useCase(WalletRepository walletRepository, TransactionRepository transactionRepository) {
-        return new CreateDepositUseCase(walletRepository, transactionRepository, CLOCK);
+        return useCase(walletRepository, transactionRepository, new PassThroughIdempotencyService());
+    }
+
+    private static CreateDepositUseCase useCase(
+            WalletRepository walletRepository,
+            TransactionRepository transactionRepository,
+            IdempotencyService idempotencyService
+    ) {
+        return new CreateDepositUseCase(walletRepository, transactionRepository, CLOCK, idempotencyService);
     }
 
     private static WalletEntity wallet(UUID userId, String balance) {

@@ -3,6 +3,7 @@ package ElFabrica.Wallet_pay.transaction.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ElFabrica.Wallet_pay.common.idempotency.IdempotentResult;
 import ElFabrica.Wallet_pay.config.ResilienceConfig;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
@@ -18,7 +19,8 @@ class TransferServiceTest {
             UUID.randomUUID(),
             UUID.randomUUID(),
             "10.00",
-            null
+            null,
+            "chave-1"
     );
 
     @Test
@@ -26,9 +28,9 @@ class TransferServiceTest {
         FakeCreateTransferUseCase useCase = new FakeCreateTransferUseCase(2);
         TransferService service = new TransferService(new ResilienceConfig().balanceRetryTemplate(), useCase);
 
-        TransferResult result = service.transfer(COMMAND);
+        IdempotentResult<TransferResult> outcome = service.transfer(COMMAND);
 
-        assertThat(result).isSameAs(useCase.result);
+        assertThat(outcome.result()).isSameAs(useCase.result);
         assertThat(useCase.calls).isEqualTo(3);
     }
 
@@ -73,12 +75,12 @@ class TransferServiceTest {
         private int calls;
 
         FakeCreateTransferUseCase(int failuresBeforeSuccess) {
-            super(null, null, null);
+            super(null, null, null, null);
             this.failuresBeforeSuccess = failuresBeforeSuccess;
         }
 
         @Override
-        public TransferResult transfer(TransferCommand command) {
+        public IdempotentResult<TransferResult> transfer(TransferCommand command) {
             calls++;
             if (businessError != null) {
                 throw businessError;
@@ -86,7 +88,7 @@ class TransferServiceTest {
             if (calls <= failuresBeforeSuccess) {
                 throw new OptimisticLockingFailureException("versao da carteira mudou");
             }
-            return result;
+            return new IdempotentResult<>(result, false);
         }
     }
 }

@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ElFabrica.Wallet_pay.common.idempotency.IdempotentResult;
 import ElFabrica.Wallet_pay.common.money.InvalidAmountException;
 import ElFabrica.Wallet_pay.config.SecurityConfig;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
@@ -233,7 +234,7 @@ class WalletControllerTest {
                 now
         );
 
-        mockMvc.perform(post("/wallets/me/deposits")
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", "chave-1")
                         .header("Authorization", "Bearer " + token(userId, Instant.now().plusSeconds(60)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -244,6 +245,7 @@ class WalletControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/transactions/" + transactionId))
+                .andExpect(header().doesNotExist("Idempotent-Replayed"))
                 .andExpect(jsonPath("$.transactionId").value(transactionId.toString()))
                 .andExpect(jsonPath("$.type").value("DEPOSIT"))
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
@@ -256,13 +258,14 @@ class WalletControllerTest {
                 .andExpect(jsonPath("$.createdAt").value("2026-10-15T10:30:00Z"));
 
         assertThat(depositService.command.userId()).isEqualTo(userId);
+        assertThat(depositService.command.idempotencyKey()).isEqualTo("chave-1");
         assertThat(depositService.command.amount()).isEqualTo("150.00");
         assertThat(depositService.command.description()).isEqualTo("Aporte inicial");
     }
 
     @Test
     void shouldRejectDepositWithoutJwt() throws Exception {
-        mockMvc.perform(post("/wallets/me/deposits")
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", "chave-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -274,7 +277,7 @@ class WalletControllerTest {
 
     @Test
     void shouldRejectDepositDescriptionLongerThan255Characters() throws Exception {
-        mockMvc.perform(post("/wallets/me/deposits")
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", "chave-1")
                         .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -292,7 +295,7 @@ class WalletControllerTest {
     void shouldReturnInvalidAmountCodeForDeposit() throws Exception {
         depositService.exception = new InvalidAmountException("Valor deve ser maior que zero");
 
-        mockMvc.perform(post("/wallets/me/deposits")
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", "chave-1")
                         .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -376,12 +379,12 @@ class WalletControllerTest {
         }
 
         @Override
-        public DepositResult deposit(DepositCommand command) {
+        public IdempotentResult<DepositResult> deposit(DepositCommand command) {
             this.command = command;
             if (exception != null) {
                 throw exception;
             }
-            return result;
+            return new IdempotentResult<>(result, false);
         }
     }
 }

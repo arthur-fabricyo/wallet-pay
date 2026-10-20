@@ -10,6 +10,7 @@ import ElFabrica.Wallet_pay.transaction.service.TransferService;
 import ElFabrica.Wallet_pay.wallet.service.BalanceConflictException;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -36,9 +37,10 @@ class TransferConcurrencyIntegrationTest extends AbstractIntegrationTest {
     }
 
     private String transferAsClient(TestUser sender, TestUser receiver, String amount) {
+        String idempotencyKey = UUID.randomUUID().toString();
         for (int attempt = 0; attempt < 50; attempt++) {
             try {
-                transferService.transfer(new TransferCommand(sender.userId(), receiver.userId(), amount, null));
+                transferService.transfer(new TransferCommand(sender.userId(), receiver.userId(), amount, null, idempotencyKey));
                 return "SUCCESS";
             } catch (InsufficientBalanceException exception) {
                 return "INSUFFICIENT_BALANCE";

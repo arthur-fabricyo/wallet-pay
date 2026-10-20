@@ -1,5 +1,6 @@
 package ElFabrica.Wallet_pay.transaction.service;
 
+import ElFabrica.Wallet_pay.common.idempotency.IdempotentResult;
 import ElFabrica.Wallet_pay.wallet.service.BalanceConflictException;
 import org.springframework.core.retry.RetryTemplate;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -16,7 +17,7 @@ public class TransferService {
         this.createTransferUseCase = createTransferUseCase;
     }
 
-    public TransferResult transfer(TransferCommand command) {
+    public IdempotentResult<TransferResult> transfer(TransferCommand command) {
         try {
             return balanceRetryTemplate.invoke(() -> createTransferUseCase.transfer(command));
         } catch (OptimisticLockingFailureException exception) {

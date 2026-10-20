@@ -1,5 +1,7 @@
 package ElFabrica.Wallet_pay.wallet.controllers;
 
+import ElFabrica.Wallet_pay.common.idempotency.IdempotencyKeys;
+import ElFabrica.Wallet_pay.common.idempotency.IdempotentResult;
 import ElFabrica.Wallet_pay.wallet.dto.DepositRequestDTO;
 import ElFabrica.Wallet_pay.wallet.dto.DepositResponseDTO;
 import ElFabrica.Wallet_pay.wallet.dto.DepositWalletResponseDTO;
@@ -23,6 +25,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -97,17 +100,22 @@ public class WalletController {
     @PostMapping("/me/deposits")
     ResponseEntity<DepositResponseDTO> deposit(
             @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader(name = IdempotencyKeys.HEADER, required = false) String idempotencyKey,
             @Valid @RequestBody DepositRequestDTO request
     ) {
-        DepositResult result = depositService.deposit(new DepositCommand(
+        IdempotentResult<DepositResult> outcome = depositService.deposit(new DepositCommand(
                 UUID.fromString(jwt.getSubject()),
                 request.amount(),
-                request.description()
+                request.description(),
+                IdempotencyKeys.require(idempotencyKey)
         ));
+        DepositResult result = outcome.result();
 
-        return ResponseEntity
-                .created(URI.create("/transactions/" + result.transactionId()))
-                .body(toResponse(result));
+        ResponseEntity.BodyBuilder builder = ResponseEntity.created(URI.create("/transactions/" + result.transactionId()));
+        if (outcome.replayed()) {
+            builder.header(IdempotencyKeys.REPLAYED_HEADER, "true");
+        }
+        return builder.body(toResponse(result));
     }
 
     private static DepositResponseDTO toResponse(DepositResult result) {

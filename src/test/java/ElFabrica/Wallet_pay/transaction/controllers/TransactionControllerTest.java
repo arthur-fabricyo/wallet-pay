@@ -3,9 +3,11 @@ package ElFabrica.Wallet_pay.transaction.controllers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ElFabrica.Wallet_pay.common.idempotency.IdempotentResult;
 import ElFabrica.Wallet_pay.config.SecurityConfig;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
@@ -61,6 +63,7 @@ class TransactionControllerTest {
         transferService.command = null;
         transferService.result = null;
         transferService.exception = null;
+        transferService.replayed = false;
         getReceiptUseCase.authenticatedUserId = null;
         getReceiptUseCase.transactionId = null;
         getReceiptUseCase.result = null;
@@ -88,7 +91,7 @@ class TransactionControllerTest {
                 now
         );
 
-        mockMvc.perform(post("/transactions/transfers")
+        mockMvc.perform(post("/transactions/transfers").header("Idempotency-Key", "chave-1")
                         .header("Authorization", "Bearer " + token(senderUserId, Instant.now().plusSeconds(60)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -115,13 +118,46 @@ class TransactionControllerTest {
 
         assertThat(transferService.command.senderUserId()).isEqualTo(senderUserId);
         assertThat(transferService.command.receiverUserId()).isEqualTo(receiverUserId);
+        assertThat(transferService.command.idempotencyKey()).isEqualTo("chave-1");
         assertThat(transferService.command.amount()).isEqualTo("25.50");
         assertThat(transferService.command.description()).isEqualTo("Almoco");
     }
 
     @Test
-    void shouldRejectTransferWithoutJwt() throws Exception {
+    void shouldMarkReplayedTransfer() throws Exception {
+        UUID senderWalletId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-08-06T10:30:00Z");
+        transferService.result = new TransferResult(
+                UUID.randomUUID(),
+                TransactionType.TRANSFER,
+                TransactionStatus.COMPLETED,
+                "25.50",
+                "BRL",
+                senderWalletId,
+                UUID.randomUUID(),
+                new TransferSenderWalletResult(senderWalletId, "74.50", "BRL", now),
+                now,
+                now
+        );
+        transferService.replayed = true;
+
         mockMvc.perform(post("/transactions/transfers")
+                        .header("Idempotency-Key", "chave-1")
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "receiverUserId": "%s",
+                                  "amount": "25.50"
+                                }
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Idempotent-Replayed", "true"));
+    }
+
+    @Test
+    void shouldRejectTransferWithoutJwt() throws Exception {
+        mockMvc.perform(post("/transactions/transfers").header("Idempotency-Key", "chave-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -134,7 +170,7 @@ class TransactionControllerTest {
 
     @Test
     void shouldRejectTransferWithExpiredJwt() throws Exception {
-        mockMvc.perform(post("/transactions/transfers")
+        mockMvc.perform(post("/transactions/transfers").header("Idempotency-Key", "chave-1")
                         .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().minusSeconds(1)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -148,7 +184,7 @@ class TransactionControllerTest {
 
     @Test
     void shouldRejectInvalidPayload() throws Exception {
-        mockMvc.perform(post("/transactions/transfers")
+        mockMvc.perform(post("/transactions/transfers").header("Idempotency-Key", "chave-1")
                         .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -165,7 +201,7 @@ class TransactionControllerTest {
     void shouldReturnNotFoundWhenWalletIsMissing() throws Exception {
         transferService.exception = new WalletNotFoundException("Carteira de destino nao encontrada");
 
-        mockMvc.perform(post("/transactions/transfers")
+        mockMvc.perform(post("/transactions/transfers").header("Idempotency-Key", "chave-1")
                         .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -182,7 +218,7 @@ class TransactionControllerTest {
     void shouldReturnUnprocessableEntityForInsufficientBalance() throws Exception {
         transferService.exception = new InsufficientBalanceException("Saldo insuficiente");
 
-        mockMvc.perform(post("/transactions/transfers")
+        mockMvc.perform(post("/transactions/transfers").header("Idempotency-Key", "chave-1")
                         .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -200,7 +236,7 @@ class TransactionControllerTest {
     void shouldReturnConflictWhenConcurrencyRetriesAreExhausted() throws Exception {
         transferService.exception = new BalanceConflictException("Operacao concorrente na carteira, tente novamente");
 
-        mockMvc.perform(post("/transactions/transfers")
+        mockMvc.perform(post("/transactions/transfers").header("Idempotency-Key", "chave-1")
                         .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -325,6 +361,7 @@ class TransactionControllerTest {
 
         private TransferCommand command;
         private TransferResult result;
+        private boolean replayed;
         private RuntimeException exception;
 
         FakeTransferService() {
@@ -332,12 +369,12 @@ class TransactionControllerTest {
         }
 
         @Override
-        public TransferResult transfer(TransferCommand command) {
+        public IdempotentResult<TransferResult> transfer(TransferCommand command) {
             this.command = command;
             if (exception != null) {
                 throw exception;
             }
-            return result;
+            return new IdempotentResult<>(result, replayed);
         }
     }
 
