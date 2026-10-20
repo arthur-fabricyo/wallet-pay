@@ -9,6 +9,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ public class PasswordRecoveryService {
     private final SecureRandom secureRandom;
     private final Duration tokenTtl;
 
+    @Autowired
     public PasswordRecoveryService(
             PasswordResetTokenRepository tokenRepository,
             UserRepository userRepository,
