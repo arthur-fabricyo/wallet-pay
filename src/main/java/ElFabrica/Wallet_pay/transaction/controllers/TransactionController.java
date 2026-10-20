@@ -4,11 +4,11 @@ import ElFabrica.Wallet_pay.transaction.dto.ReceiptResponseDTO;
 import ElFabrica.Wallet_pay.transaction.dto.TransferRequestDTO;
 import ElFabrica.Wallet_pay.transaction.dto.TransferResponseDTO;
 import ElFabrica.Wallet_pay.transaction.dto.TransferSenderWalletResponseDTO;
-import ElFabrica.Wallet_pay.transaction.service.CreateTransferUseCase;
 import ElFabrica.Wallet_pay.transaction.service.GetReceiptUseCase;
 import ElFabrica.Wallet_pay.transaction.service.ReceiptResult;
 import ElFabrica.Wallet_pay.transaction.service.TransferCommand;
 import ElFabrica.Wallet_pay.transaction.service.TransferResult;
+import ElFabrica.Wallet_pay.transaction.service.TransferService;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
@@ -26,11 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/transactions")
 public class TransactionController {
 
-    private final CreateTransferUseCase createTransferUseCase;
+    private final TransferService transferService;
     private final GetReceiptUseCase getReceiptUseCase;
 
-    public TransactionController(CreateTransferUseCase createTransferUseCase, GetReceiptUseCase getReceiptUseCase) {
-        this.createTransferUseCase = createTransferUseCase;
+    public TransactionController(TransferService transferService, GetReceiptUseCase getReceiptUseCase) {
+        this.transferService = transferService;
         this.getReceiptUseCase = getReceiptUseCase;
     }
 
@@ -39,7 +39,7 @@ public class TransactionController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody TransferRequestDTO request
     ) {
-        TransferResult result = createTransferUseCase.transfer(new TransferCommand(
+        TransferResult result = transferService.transfer(new TransferCommand(
                 UUID.fromString(jwt.getSubject()),
                 request.receiverUserId(),
                 request.amount(),
