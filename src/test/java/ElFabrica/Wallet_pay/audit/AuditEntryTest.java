@@ -39,6 +39,15 @@ class AuditEntryTest {
     }
 
     @Test
+    void shouldTruncateRawValuesLongerThanTheLimit() {
+        String exact = "1".repeat(32);
+
+        assertThat(AuditEntry.truncateRaw(null)).isNull();
+        assertThat(AuditEntry.truncateRaw(exact)).isEqualTo(exact);
+        assertThat(AuditEntry.truncateRaw(exact + "9")).isEqualTo(exact + "...");
+    }
+
+    @Test
     void shouldKeepActorWhenInformed() {
         UUID userId = UUID.randomUUID();
 

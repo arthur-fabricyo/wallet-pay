@@ -104,6 +104,18 @@ class AuditIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void shouldTruncateAnOversizedRejectedAmount() throws Exception {
+        TestUser user = createVerifiedUser("Joao Silva", "0.00");
+        String oversized = "9".repeat(200);
+
+        deposit(user, oversized)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_AMOUNT"));
+
+        assertThat(metadataValue("DEPOSIT_REJECTED", "amount")).isEqualTo("9".repeat(32) + "...");
+    }
+
+    @Test
     void shouldRecordTheAuthenticationLifecycleWithoutSensitiveData() throws Exception {
         String email = "joao.audit@email.com";
         String document = "52998224725";

@@ -53,7 +53,7 @@ public class TransferService {
 
     private static Map<String, String> rejectionMetadata(TransferCommand command, BusinessException exception) {
         return AuditEntry.metadata(
-                "amount", command.amount(),
+                "amount", AuditEntry.truncateRaw(command.amount()),
                 "receiverUserId", command.receiverUserId(),
                 "failureCode", exception.getErrorCode(),
                 "limitType", exception instanceof LimitExceededException limitExceeded ? limitExceeded.getLimitType() : null

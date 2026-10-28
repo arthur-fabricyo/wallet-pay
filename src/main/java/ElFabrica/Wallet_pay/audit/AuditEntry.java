@@ -37,6 +37,16 @@ public record AuditEntry(
         return failureCode == null ? AuditOutcome.SUCCESS : AuditOutcome.FAILURE;
     }
 
+    static final int MAX_RAW_VALUE_LENGTH = 32;
+
+    /** Bounds a raw client value (e.g. an amount that failed validation) before it goes into append-only metadata. */
+    public static String truncateRaw(String value) {
+        if (value == null || value.length() <= MAX_RAW_VALUE_LENGTH) {
+            return value;
+        }
+        return value.substring(0, MAX_RAW_VALUE_LENGTH) + "...";
+    }
+
     public static Map<String, String> metadata(Object... keysAndValues) {
         if (keysAndValues.length % 2 != 0) {
             throw new IllegalArgumentException("metadata exige pares de chave e valor");
