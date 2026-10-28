@@ -24,7 +24,7 @@ class AuthServiceTest {
     void shouldAuditSuccessfulLogin() {
         UserEntity user = verifiedUser();
         RecordingAuditLogger auditLogger = new RecordingAuditLogger();
-        AuthService authService = new AuthService(
+        AuthService authService = authService(
                 new FakeUserRepository(user).proxy(),
                 new FakeRefreshTokenRepository().proxy(),
                 matchingPasswordEncoder(),
@@ -44,7 +44,7 @@ class AuthServiceTest {
     @Test
     void shouldAuditFailedLoginWithReasonAndWithoutThePassword() {
         RecordingAuditLogger auditLogger = new RecordingAuditLogger();
-        AuthService authService = new AuthService(
+        AuthService authService = authService(
                 new FakeUserRepository(verifiedUser()).proxy(),
                 new FakeRefreshTokenRepository().proxy(),
                 nonMatchingPasswordEncoder(),
@@ -70,7 +70,7 @@ class AuthServiceTest {
         UserEntity user = verifiedUser();
         FakeUserRepository userRepository = new FakeUserRepository(user);
         FakeRefreshTokenRepository refreshTokenRepository = new FakeRefreshTokenRepository();
-        AuthService authService = new AuthService(
+        AuthService authService = authService(
                 userRepository.proxy(),
                 refreshTokenRepository.proxy(),
                 matchingPasswordEncoder(),
@@ -90,7 +90,7 @@ class AuthServiceTest {
 
     @Test
     void shouldRejectInvalidPassword() {
-        AuthService authService = new AuthService(
+        AuthService authService = authService(
                 new FakeUserRepository(verifiedUser()).proxy(),
                 new FakeRefreshTokenRepository().proxy(),
                 nonMatchingPasswordEncoder(),
@@ -104,7 +104,7 @@ class AuthServiceTest {
 
     @Test
     void shouldRejectMissingUser() {
-        AuthService authService = new AuthService(
+        AuthService authService = authService(
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository().proxy(),
                 matchingPasswordEncoder(),
@@ -118,7 +118,7 @@ class AuthServiceTest {
 
     @Test
     void shouldRejectUnverifiedEmail() {
-        AuthService authService = new AuthService(
+        AuthService authService = authService(
                 new FakeUserRepository(unverifiedUser()).proxy(),
                 new FakeRefreshTokenRepository().proxy(),
                 matchingPasswordEncoder(),
@@ -137,7 +137,7 @@ class AuthServiceTest {
                 verifiedUser(),
                 Instant.now().plusSeconds(60)
         );
-        AuthService authService = new AuthService(
+        AuthService authService = authService(
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository(refreshToken).proxy(),
                 matchingPasswordEncoder(),
@@ -158,7 +158,7 @@ class AuthServiceTest {
                 verifiedUser(),
                 Instant.now().minusSeconds(1)
         );
-        AuthService authService = new AuthService(
+        AuthService authService = authService(
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository(refreshToken).proxy(),
                 matchingPasswordEncoder(),
@@ -172,7 +172,7 @@ class AuthServiceTest {
 
     @Test
     void shouldRejectMissingRefreshToken() {
-        AuthService authService = new AuthService(
+        AuthService authService = authService(
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository(null).proxy(),
                 matchingPasswordEncoder(),
@@ -192,7 +192,7 @@ class AuthServiceTest {
                 Instant.now().plusSeconds(60)
         );
         refreshToken.invalidate(Instant.now());
-        AuthService authService = new AuthService(
+        AuthService authService = authService(
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository(refreshToken).proxy(),
                 matchingPasswordEncoder(),
@@ -211,7 +211,7 @@ class AuthServiceTest {
                 verifiedUser(),
                 Instant.now().plusSeconds(60)
         );
-        AuthService authService = new AuthService(
+        AuthService authService = authService(
                 new FakeUserRepository(null).proxy(),
                 new FakeRefreshTokenRepository(refreshToken).proxy(),
                 matchingPasswordEncoder(),
@@ -224,6 +224,18 @@ class AuthServiceTest {
         assertThat(refreshToken.isInvalidated()).isTrue();
         assertThatThrownBy(() -> authService.refresh("refresh-token"))
                 .isInstanceOf(InvalidRefreshTokenException.class);
+    }
+
+    private static AuthService authService(
+            UserRepository userRepository,
+            RefreshTokenRepository refreshTokenRepository,
+            PasswordEncoder passwordEncoder,
+            AccessTokenService accessTokenService,
+            RecordingAuditLogger auditLogger
+    ) {
+        LoginUseCase loginUseCase = new LoginUseCase(
+                userRepository, refreshTokenRepository, passwordEncoder, accessTokenService, auditLogger);
+        return new AuthService(loginUseCase, refreshTokenRepository, accessTokenService, auditLogger);
     }
 
     private static AccessTokenService fixedAccessTokenService() {

@@ -324,7 +324,7 @@ class AuthControllerTest {
         private String logoutToken;
 
         FakeAuthService() {
-            super(null, null, null, null, null);
+            super(null, null, null, null);
         }
 
         @Override
