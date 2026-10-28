@@ -36,6 +36,8 @@ public class IntegrationTestConfiguration {
         return new CapturingPasswordRecoverySender();
     }
 
+    // Registered as a member class of this @Import-ed configuration (component scan skips classes nested in a
+    // @TestConfiguration); declaring it as an @Bean too would map /test-support/boom twice ("Ambiguous mapping").
     @RestController
     @RequestMapping("/test-support")
     public static class FailingProbeController {
