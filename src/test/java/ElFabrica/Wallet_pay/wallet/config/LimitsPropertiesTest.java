@@ -52,6 +52,24 @@ class LimitsPropertiesTest {
         )).isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void shouldRejectLimitsWithMoreThanTwoDecimalPlaces() {
+        assertThatThrownBy(() -> transfer("5000.001", "10000.00", "50000.00", "1000.00", "1000.00"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("transfer.per-operation");
+        assertThatThrownBy(() -> new LimitsProperties.Deposit(new BigDecimal("10000.00"), new BigDecimal("20000.005")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("deposit.daily");
+        assertThat(new LimitsProperties.Deposit(new BigDecimal("10000.000"), new BigDecimal("20000")).daily())
+                .isEqualByComparingTo("20000.00");
+    }
+
+    @Test
+    void shouldRejectNightWindowStartingAndEndingAtTheSameTime() {
+        assertThatThrownBy(() -> new LimitsProperties.Night("22:00", "22:00"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     private static LimitsProperties.Transfer transfer(
             String perOperation,
             String daily,

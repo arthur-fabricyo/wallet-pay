@@ -41,6 +41,9 @@ public record LimitsProperties(
         public Night {
             requireTime(start, "start");
             requireTime(end, "end");
+            if (start != null && end != null && LocalTime.parse(start).equals(LocalTime.parse(end))) {
+                throw new IllegalArgumentException("walletpay.limits.night.start e end devem ser diferentes");
+            }
         }
 
         public LocalTime startTime() {
@@ -73,6 +76,11 @@ public record LimitsProperties(
             @NotNull @Positive BigDecimal nightWindow
     ) {
         public Transfer {
+            requireCents(perOperation, "transfer.per-operation");
+            requireCents(daily, "transfer.daily");
+            requireCents(monthly, "transfer.monthly");
+            requireCents(nightPerOperation, "transfer.night-per-operation");
+            requireCents(nightWindow, "transfer.night-window");
             if (perOperation != null && daily != null && monthly != null
                     && nightPerOperation != null && nightWindow != null) {
                 Map<String, String> violations = new EffectiveTransferLimits(
@@ -90,11 +98,19 @@ public record LimitsProperties(
             @NotNull @Positive BigDecimal daily
     ) {
         public Deposit {
+            requireCents(perOperation, "deposit.per-operation");
+            requireCents(daily, "deposit.daily");
             if (perOperation != null && daily != null && perOperation.compareTo(daily) > 0) {
                 throw new IllegalArgumentException(
                         "walletpay.limits.deposit: per-operation deve ser menor ou igual a daily"
                 );
             }
+        }
+    }
+
+    private static void requireCents(BigDecimal value, String field) {
+        if (value != null && value.stripTrailingZeros().scale() > 2) {
+            throw new IllegalArgumentException("walletpay.limits." + field + " aceita no maximo 2 casas decimais");
         }
     }
 }
