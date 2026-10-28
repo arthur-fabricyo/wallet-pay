@@ -6,6 +6,7 @@ public record TransferCommand(
         UUID senderUserId,
         UUID receiverUserId,
         String amount,
-        String description
+        String description,
+        String idempotencyKey
 ) {
 }

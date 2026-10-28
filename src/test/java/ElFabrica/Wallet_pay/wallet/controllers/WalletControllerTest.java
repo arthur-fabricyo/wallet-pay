@@ -1,20 +1,36 @@
 package ElFabrica.Wallet_pay.wallet.controllers;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ElFabrica.Wallet_pay.common.idempotency.IdempotentResult;
+import ElFabrica.Wallet_pay.common.money.InvalidAmountException;
 import ElFabrica.Wallet_pay.config.SecurityConfig;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
+import ElFabrica.Wallet_pay.wallet.service.DepositCommand;
+import ElFabrica.Wallet_pay.wallet.service.DepositResult;
+import ElFabrica.Wallet_pay.wallet.service.DepositService;
+import ElFabrica.Wallet_pay.wallet.service.DepositWalletResult;
 import ElFabrica.Wallet_pay.wallet.service.GetWalletBalanceUseCase;
+import ElFabrica.Wallet_pay.wallet.service.GetWalletLimitsUseCase;
 import ElFabrica.Wallet_pay.wallet.service.GetWalletStatementUseCase;
+import ElFabrica.Wallet_pay.wallet.service.InvalidLimitsException;
 import ElFabrica.Wallet_pay.wallet.service.InvalidStatementQueryException;
 import ElFabrica.Wallet_pay.wallet.service.StatementDirection;
 import ElFabrica.Wallet_pay.wallet.service.StatementEntryResult;
 import ElFabrica.Wallet_pay.wallet.service.StatementQuery;
 import ElFabrica.Wallet_pay.wallet.service.StatementResult;
+import ElFabrica.Wallet_pay.wallet.service.UpdateWalletLimitsCommand;
+import ElFabrica.Wallet_pay.wallet.service.UpdateWalletLimitsUseCase;
 import ElFabrica.Wallet_pay.wallet.service.WalletBalanceResult;
+import ElFabrica.Wallet_pay.wallet.service.WalletLimitsResult;
 import ElFabrica.Wallet_pay.wallet.service.WalletNotFoundException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -24,6 +40,7 @@ import com.nimbusds.jwt.SignedJWT;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +49,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -51,6 +69,15 @@ class WalletControllerTest {
     @Autowired
     private FakeGetWalletStatementUseCase getWalletStatementUseCase;
 
+    @Autowired
+    private FakeDepositService depositService;
+
+    @Autowired
+    private FakeGetWalletLimitsUseCase getWalletLimitsUseCase;
+
+    @Autowired
+    private FakeUpdateWalletLimitsUseCase updateWalletLimitsUseCase;
+
     @BeforeEach
     void setUp() {
         getWalletBalanceUseCase.result = null;
@@ -60,6 +87,13 @@ class WalletControllerTest {
         getWalletStatementUseCase.exception = null;
         getWalletStatementUseCase.userId = null;
         getWalletStatementUseCase.query = null;
+        depositService.command = null;
+        depositService.result = null;
+        depositService.exception = null;
+        getWalletLimitsUseCase.result = null;
+        updateWalletLimitsUseCase.command = null;
+        updateWalletLimitsUseCase.result = null;
+        updateWalletLimitsUseCase.exception = null;
     }
 
     @Test
@@ -200,8 +234,192 @@ class WalletControllerTest {
         return jwt.serialize();
     }
 
+    @Test
+    void shouldCreateDepositForAuthenticatedUser() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        UUID walletId = UUID.randomUUID();
+        Instant now = Instant.parse("2026-10-15T10:30:00Z");
+        depositService.result = new DepositResult(
+                transactionId,
+                TransactionType.DEPOSIT,
+                TransactionStatus.COMPLETED,
+                "150.00",
+                "BRL",
+                "Aporte inicial",
+                new DepositWalletResult(walletId, "250.00", "BRL", now),
+                now,
+                now
+        );
+
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", "chave-1")
+                        .header("Authorization", "Bearer " + token(userId, Instant.now().plusSeconds(60)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": "150.00",
+                                  "description": "Aporte inicial"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/transactions/" + transactionId))
+                .andExpect(header().doesNotExist("Idempotent-Replayed"))
+                .andExpect(jsonPath("$.transactionId").value(transactionId.toString()))
+                .andExpect(jsonPath("$.type").value("DEPOSIT"))
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.amount").value("150.00"))
+                .andExpect(jsonPath("$.currency").value("BRL"))
+                .andExpect(jsonPath("$.description").value("Aporte inicial"))
+                .andExpect(jsonPath("$.wallet.id").value(walletId.toString()))
+                .andExpect(jsonPath("$.wallet.balance").value("250.00"))
+                .andExpect(jsonPath("$.wallet.updatedAt").value("2026-10-15T10:30:00Z"))
+                .andExpect(jsonPath("$.createdAt").value("2026-10-15T10:30:00Z"));
+
+        assertThat(depositService.command.userId()).isEqualTo(userId);
+        assertThat(depositService.command.idempotencyKey()).isEqualTo("chave-1");
+        assertThat(depositService.command.amount()).isEqualTo("150.00");
+        assertThat(depositService.command.description()).isEqualTo("Aporte inicial");
+    }
+
+    @Test
+    void shouldRejectDepositWithoutJwt() throws Exception {
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", "chave-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": "150.00"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectDepositDescriptionLongerThan255Characters() throws Exception {
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", "chave-1")
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": "150.00",
+                                  "description": "%s"
+                                }
+                                """.formatted("a".repeat(256))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fields.description").value("Descricao deve ter no maximo 255 caracteres"));
+    }
+
+    @Test
+    void shouldReturnInvalidAmountCodeForDeposit() throws Exception {
+        depositService.exception = new InvalidAmountException("Valor deve ser maior que zero");
+
+        mockMvc.perform(post("/wallets/me/deposits").header("Idempotency-Key", "chave-1")
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "amount": "0"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_AMOUNT"));
+    }
+
+    @Test
+    void shouldReturnLimitsWithEffectiveGlobalCustomAndUsage() throws Exception {
+        getWalletLimitsUseCase.result = sampleLimits();
+
+        mockMvc.perform(get("/wallets/me/limits")
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transfer.perOperation.effective").value("2000.00"))
+                .andExpect(jsonPath("$.transfer.perOperation.global").value("5000.00"))
+                .andExpect(jsonPath("$.transfer.perOperation.custom").value("2000.00"))
+                .andExpect(jsonPath("$.transfer.daily.custom").value(nullValue()))
+                .andExpect(jsonPath("$.transfer.daily.used").value("350.00"))
+                .andExpect(jsonPath("$.transfer.daily.available").value("9650.00"))
+                .andExpect(jsonPath("$.deposit.daily.available").value("19850.00"))
+                .andExpect(jsonPath("$.night.start").value("20:00"))
+                .andExpect(jsonPath("$.night.active").value(false));
+    }
+
+    @Test
+    void shouldUpdateLimitsOfAuthenticatedUser() throws Exception {
+        UUID userId = UUID.randomUUID();
+        updateWalletLimitsUseCase.result = sampleLimits();
+
+        mockMvc.perform(put("/wallets/me/limits")
+                        .header("Authorization", "Bearer " + token(userId, Instant.now().plusSeconds(60)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "transferPerOperation": "2000.00",
+                                  "transferDaily": null
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transfer.perOperation.custom").value("2000.00"));
+
+        assertThat(updateWalletLimitsUseCase.command.userId()).isEqualTo(userId);
+        assertThat(updateWalletLimitsUseCase.command.transferPerOperation()).isEqualTo("2000.00");
+        assertThat(updateWalletLimitsUseCase.command.transferDaily()).isNull();
+        assertThat(updateWalletLimitsUseCase.command.transferMonthly()).isNull();
+    }
+
+    @Test
+    void shouldReturnInvalidLimitsWithFields() throws Exception {
+        updateWalletLimitsUseCase.exception = new InvalidLimitsException(
+                "Limites invalidos",
+                Map.of("transferPerOperation", "Limite acima do teto global de 5000.00")
+        );
+
+        mockMvc.perform(put("/wallets/me/limits")
+                        .header("Authorization", "Bearer " + token(UUID.randomUUID(), Instant.now().plusSeconds(60)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "transferPerOperation": "5000.01"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_LIMITS"))
+                .andExpect(jsonPath("$.fields.transferPerOperation").value("Limite acima do teto global de 5000.00"));
+    }
+
+    @Test
+    void shouldRejectLimitsWithoutJwt() throws Exception {
+        mockMvc.perform(get("/wallets/me/limits")).andExpect(status().isUnauthorized());
+    }
+
+    private static WalletLimitsResult sampleLimits() {
+        return new WalletLimitsResult(
+                new WalletLimitsResult.TransferLimits(
+                        new WalletLimitsResult.LimitValue("2000.00", "5000.00", "2000.00"),
+                        new WalletLimitsResult.PeriodLimitValue("10000.00", "10000.00", null, "350.00", "9650.00"),
+                        new WalletLimitsResult.PeriodLimitValue("50000.00", "50000.00", null, "1200.00", "48800.00"),
+                        new WalletLimitsResult.LimitValue("1000.00", "1000.00", null),
+                        new WalletLimitsResult.PeriodLimitValue("1000.00", "1000.00", null, "0.00", "1000.00")
+                ),
+                new WalletLimitsResult.DepositLimits(
+                        new WalletLimitsResult.LimitValue("10000.00", "10000.00", null),
+                        new WalletLimitsResult.PeriodLimitValue("20000.00", "20000.00", null, "150.00", "19850.00")
+                ),
+                new WalletLimitsResult.Night("20:00", "06:00", "America/Sao_Paulo", false)
+        );
+    }
+
     @TestConfiguration
     static class TestBeans {
+
+        @Bean
+        FakeGetWalletLimitsUseCase fakeGetWalletLimitsUseCase() {
+            return new FakeGetWalletLimitsUseCase();
+        }
+
+        @Bean
+        FakeUpdateWalletLimitsUseCase fakeUpdateWalletLimitsUseCase() {
+            return new FakeUpdateWalletLimitsUseCase();
+        }
 
         @Bean
         FakeGetWalletBalanceUseCase fakeGetWalletBalanceUseCase() {
@@ -211,6 +429,45 @@ class WalletControllerTest {
         @Bean
         FakeGetWalletStatementUseCase fakeGetWalletStatementUseCase() {
             return new FakeGetWalletStatementUseCase();
+        }
+
+        @Bean
+        FakeDepositService fakeDepositService() {
+            return new FakeDepositService();
+        }
+    }
+
+    static class FakeGetWalletLimitsUseCase extends GetWalletLimitsUseCase {
+
+        private WalletLimitsResult result;
+
+        FakeGetWalletLimitsUseCase() {
+            super(null, null, null);
+        }
+
+        @Override
+        public WalletLimitsResult getLimits(UUID userId) {
+            return result;
+        }
+    }
+
+    static class FakeUpdateWalletLimitsUseCase extends UpdateWalletLimitsUseCase {
+
+        private UpdateWalletLimitsCommand command;
+        private WalletLimitsResult result;
+        private RuntimeException exception;
+
+        FakeUpdateWalletLimitsUseCase() {
+            super(null, null, null, null, null, null);
+        }
+
+        @Override
+        public WalletLimitsResult update(UpdateWalletLimitsCommand command) {
+            this.command = command;
+            if (exception != null) {
+                throw exception;
+            }
+            return result;
         }
     }
 
@@ -253,6 +510,26 @@ class WalletControllerTest {
                 throw exception;
             }
             return result;
+        }
+    }
+
+    static class FakeDepositService extends DepositService {
+
+        private DepositCommand command;
+        private DepositResult result;
+        private RuntimeException exception;
+
+        FakeDepositService() {
+            super(null, null, null);
+        }
+
+        @Override
+        public IdempotentResult<DepositResult> deposit(DepositCommand command) {
+            this.command = command;
+            if (exception != null) {
+                throw exception;
+            }
+            return new IdempotentResult<>(result, false);
         }
     }
 }

@@ -1,11 +1,13 @@
 package ElFabrica.Wallet_pay.auth.service;
 
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ElFabrica.Wallet_pay.auth.domain.PasswordResetTokenEntity;
 import ElFabrica.Wallet_pay.auth.repository.PasswordResetTokenRepository;
 import ElFabrica.Wallet_pay.auth.repository.RefreshTokenRepository;
+import ElFabrica.Wallet_pay.support.RecordingAuditLogger;
 import ElFabrica.Wallet_pay.user.domain.UserEntity;
 import ElFabrica.Wallet_pay.user.repository.UserRepository;
 import java.lang.reflect.Field;
@@ -84,7 +86,7 @@ class PasswordRecoveryServiceTest {
 
         assertThatThrownBy(() -> service.reset("missing-token", "NovaSenha123"))
                 .isInstanceOfSatisfying(PasswordResetTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(PasswordRecoveryService.TOKEN_INVALID));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_RESET_TOKEN_INVALID));
     }
 
     @Test
@@ -97,7 +99,7 @@ class PasswordRecoveryServiceTest {
 
         assertThatThrownBy(() -> service.reset(" ", "NovaSenha123"))
                 .isInstanceOfSatisfying(PasswordResetTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(PasswordRecoveryService.TOKEN_INVALID));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_RESET_TOKEN_INVALID));
     }
 
     @Test
@@ -115,7 +117,7 @@ class PasswordRecoveryServiceTest {
 
         assertThatThrownBy(() -> service.reset("expired-token", "NovaSenha123"))
                 .isInstanceOfSatisfying(PasswordResetTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(PasswordRecoveryService.TOKEN_EXPIRED));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_RESET_TOKEN_EXPIRED));
     }
 
     @Test
@@ -134,7 +136,7 @@ class PasswordRecoveryServiceTest {
 
         assertThatThrownBy(() -> service.reset("used-token", "NovaSenha123"))
                 .isInstanceOfSatisfying(PasswordResetTokenException.class, exception ->
-                        assertThat(exception.getCode()).isEqualTo(PasswordRecoveryService.TOKEN_ALREADY_USED));
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.PASSWORD_RESET_TOKEN_ALREADY_USED));
     }
 
     @Test
@@ -166,6 +168,7 @@ class PasswordRecoveryServiceTest {
                 refreshTokenRepository.proxy(),
                 tokenRepository.sender,
                 passwordEncoder(),
+                new RecordingAuditLogger(),
                 new SecureRandom(),
                 Duration.ofMinutes(30)
         );

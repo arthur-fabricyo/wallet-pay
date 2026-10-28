@@ -3,6 +3,15 @@ package ElFabrica.Wallet_pay.transaction.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ElFabrica.Wallet_pay.audit.AuditAction;
+import ElFabrica.Wallet_pay.audit.AuditLogger;
+import ElFabrica.Wallet_pay.common.idempotency.IdempotencyService;
+import ElFabrica.Wallet_pay.common.idempotency.IdempotentOperation;
+import ElFabrica.Wallet_pay.common.idempotency.RequestHash;
+import ElFabrica.Wallet_pay.common.money.InvalidAmountException;
+import ElFabrica.Wallet_pay.support.PassThroughIdempotencyService;
+import ElFabrica.Wallet_pay.support.PermissiveOperationLimitService;
+import ElFabrica.Wallet_pay.support.RecordingAuditLogger;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
@@ -13,7 +22,9 @@ import ElFabrica.Wallet_pay.wallet.repository.WalletRepository;
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -21,6 +32,57 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class CreateTransferUseCaseTest {
+
+    private static final Instant NOW = Instant.parse("2026-08-06T10:30:00Z");
+    private static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
+
+    private static CreateTransferUseCase useCase(
+            WalletRepository walletRepository,
+            TransactionRepository transactionRepository
+    ) {
+        return useCase(walletRepository, transactionRepository, new PassThroughIdempotencyService());
+    }
+
+    private static CreateTransferUseCase useCase(
+            WalletRepository walletRepository,
+            TransactionRepository transactionRepository,
+            IdempotencyService idempotencyService
+    ) {
+        return useCase(walletRepository, transactionRepository, idempotencyService, new RecordingAuditLogger());
+    }
+
+    private static CreateTransferUseCase useCase(
+            WalletRepository walletRepository,
+            TransactionRepository transactionRepository,
+            IdempotencyService idempotencyService,
+            AuditLogger auditLogger
+    ) {
+        return new CreateTransferUseCase(walletRepository, transactionRepository, CLOCK, idempotencyService, auditLogger, new PermissiveOperationLimitService());
+    }
+
+    @Test
+    void shouldProtectTransferWithIdempotencyKeyAndNormalizedHash() {
+        UUID senderUserId = UUID.randomUUID();
+        UUID receiverUserId = UUID.randomUUID();
+        FakeWalletRepository walletRepository = new FakeWalletRepository(Map.of(
+                senderUserId, wallet(senderUserId, UUID.randomUUID(), "100.00"),
+                receiverUserId, wallet(receiverUserId, UUID.randomUUID(), "10.00")
+        ));
+        PassThroughIdempotencyService idempotencyService = new PassThroughIdempotencyService();
+        CreateTransferUseCase useCase = useCase(
+                walletRepository.proxy(),
+                new FakeTransactionRepository().proxy(),
+                idempotencyService
+        );
+
+        useCase.transfer(new TransferCommand(senderUserId, receiverUserId, "25.5", " Almoco ", "chave-1"));
+
+        assertThat(idempotencyService.lastRequest.userId()).isEqualTo(senderUserId);
+        assertThat(idempotencyService.lastRequest.operation()).isEqualTo(IdempotentOperation.TRANSFER_CREATE);
+        assertThat(idempotencyService.lastRequest.key()).isEqualTo("chave-1");
+        assertThat(idempotencyService.lastRequest.requestHash())
+                .isEqualTo(RequestHash.of(receiverUserId.toString(), "25.50", "Almoco"));
+    }
 
     @Test
     void shouldTransferBalanceAndRegisterTransaction() {
@@ -35,7 +97,7 @@ class CreateTransferUseCaseTest {
                 receiverUserId, receiverWallet
         ));
         FakeTransactionRepository transactionRepository = new FakeTransactionRepository();
-        CreateTransferUseCase useCase = new CreateTransferUseCase(
+        CreateTransferUseCase useCase = useCase(
                 walletRepository.proxy(),
                 transactionRepository.proxy()
         );
@@ -44,8 +106,9 @@ class CreateTransferUseCaseTest {
                 senderUserId,
                 receiverUserId,
                 "25.50",
-                " Almoco "
-        ));
+                " Almoco ",
+                "chave-1"
+        )).result();
 
         assertThat(senderWallet.getBalance()).isEqualByComparingTo("74.50");
         assertThat(receiverWallet.getBalance()).isEqualByComparingTo("35.50");
@@ -64,6 +127,40 @@ class CreateTransferUseCaseTest {
         assertThat(result.senderWallet().currency()).isEqualTo("BRL");
         assertThat(result.createdAt()).isNotNull();
         assertThat(result.completedAt()).isNotNull();
+        assertThat(transactionRepository.savedTransaction.getCreatedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void shouldRecordTransferCreatedInTheSameTransaction() {
+        UUID senderUserId = UUID.randomUUID();
+        UUID receiverUserId = UUID.randomUUID();
+        UUID senderWalletId = UUID.randomUUID();
+        UUID receiverWalletId = UUID.randomUUID();
+        FakeWalletRepository walletRepository = new FakeWalletRepository(Map.of(
+                senderUserId, wallet(senderUserId, senderWalletId, "100.00"),
+                receiverUserId, wallet(receiverUserId, receiverWalletId, "10.00")
+        ));
+        FakeTransactionRepository transactionRepository = new FakeTransactionRepository();
+        RecordingAuditLogger auditLogger = new RecordingAuditLogger();
+        CreateTransferUseCase useCase = useCase(
+                walletRepository.proxy(),
+                transactionRepository.proxy(),
+                new PassThroughIdempotencyService(),
+                auditLogger
+        );
+
+        useCase.transfer(new TransferCommand(senderUserId, receiverUserId, "25.50", null, "chave-1"));
+
+        assertThat(auditLogger.recorded).singleElement().satisfies(entry -> {
+            assertThat(entry.action()).isEqualTo(AuditAction.TRANSFER_CREATED);
+            assertThat(entry.resourceId()).isEqualTo(transactionRepository.transactionId);
+            assertThat(entry.actorUserId()).isEqualTo(senderUserId);
+            assertThat(entry.metadata())
+                    .containsEntry("amount", "25.50")
+                    .containsEntry("currency", "BRL")
+                    .containsEntry("senderWalletId", senderWalletId.toString())
+                    .containsEntry("receiverWalletId", receiverWalletId.toString());
+        });
     }
 
     @Test
@@ -75,14 +172,16 @@ class CreateTransferUseCaseTest {
                 receiverUserId, wallet(receiverUserId, UUID.randomUUID(), "10.00")
         ));
         FakeTransactionRepository transactionRepository = new FakeTransactionRepository();
-        CreateTransferUseCase useCase = new CreateTransferUseCase(walletRepository.proxy(), transactionRepository.proxy());
+        CreateTransferUseCase useCase = useCase(walletRepository.proxy(), transactionRepository.proxy());
 
         assertThatThrownBy(() -> useCase.transfer(new TransferCommand(
                 senderUserId,
                 receiverUserId,
                 "10.123",
-                null
-        ))).isInstanceOf(InvalidTransferException.class);
+                null,
+                "chave-1"
+        ))).isInstanceOf(InvalidAmountException.class)
+                .hasMessage("Valor deve ter no maximo duas casas decimais");
 
         assertThat(transactionRepository.savedTransaction).isNull();
     }
@@ -94,7 +193,7 @@ class CreateTransferUseCaseTest {
         WalletEntity senderWallet = wallet(senderUserId, UUID.randomUUID(), "20.00");
         WalletEntity receiverWallet = wallet(receiverUserId, UUID.randomUUID(), "10.00");
         FakeTransactionRepository transactionRepository = new FakeTransactionRepository();
-        CreateTransferUseCase useCase = new CreateTransferUseCase(
+        CreateTransferUseCase useCase = useCase(
                 new FakeWalletRepository(Map.of(senderUserId, senderWallet, receiverUserId, receiverWallet)).proxy(),
                 transactionRepository.proxy()
         );
@@ -103,7 +202,8 @@ class CreateTransferUseCaseTest {
                 senderUserId,
                 receiverUserId,
                 "25.50",
-                null
+                null,
+                "chave-1"
         ))).isInstanceOf(InsufficientBalanceException.class);
 
         assertThat(senderWallet.getBalance()).isEqualByComparingTo("20.00");
@@ -115,7 +215,7 @@ class CreateTransferUseCaseTest {
     void shouldRejectTransferToSameUser() {
         UUID userId = UUID.randomUUID();
         FakeWalletRepository walletRepository = new FakeWalletRepository(Map.of());
-        CreateTransferUseCase useCase = new CreateTransferUseCase(
+        CreateTransferUseCase useCase = useCase(
                 walletRepository.proxy(),
                 new FakeTransactionRepository().proxy()
         );
@@ -124,7 +224,8 @@ class CreateTransferUseCaseTest {
                 userId,
                 userId,
                 "10.00",
-                null
+                null,
+                "chave-1"
         ))).isInstanceOf(InvalidTransferException.class);
 
         assertThat(walletRepository.findByUserIdCalls).isEqualTo(0);

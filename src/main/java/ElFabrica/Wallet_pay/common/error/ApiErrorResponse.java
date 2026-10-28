@@ -1,23 +1,25 @@
 package ElFabrica.Wallet_pay.common.error;
 
+import ElFabrica.Wallet_pay.common.web.RequestIdFilter;
 import java.util.Map;
+import org.slf4j.MDC;
 
 public record ApiErrorResponse(
         int status,
         String error,
         String code,
         String message,
-        Map<String, String> fields
+        Map<String, String> fields,
+        String requestId
 ) {
-    public ApiErrorResponse(int status, String error, String message) {
-        this(status, error, null, message, Map.of());
-    }
-
-    public ApiErrorResponse(int status, String error, String message, Map<String, String> fields) {
-        this(status, error, null, message, fields);
-    }
-
-    public ApiErrorResponse(int status, String error, String code, String message) {
-        this(status, error, code, message, Map.of());
+    public static ApiErrorResponse of(ErrorCode code, String message, Map<String, String> fields) {
+        return new ApiErrorResponse(
+                code.status(),
+                code.error(),
+                code.name(),
+                message,
+                fields == null ? Map.of() : fields,
+                MDC.get(RequestIdFilter.MDC_KEY)
+        );
     }
 }

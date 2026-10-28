@@ -1,8 +1,11 @@
 package ElFabrica.Wallet_pay.transaction.service;
 
-public class ReceiptAccessDeniedException extends RuntimeException {
+import ElFabrica.Wallet_pay.common.error.BusinessException;
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
+
+public class ReceiptAccessDeniedException extends BusinessException {
 
     public ReceiptAccessDeniedException(String message) {
-        super(message);
+        super(ErrorCode.RECEIPT_ACCESS_DENIED, message);
     }
 }

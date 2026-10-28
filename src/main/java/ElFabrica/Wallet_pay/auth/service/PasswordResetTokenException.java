@@ -1,15 +1,11 @@
 package ElFabrica.Wallet_pay.auth.service;
 
-public class PasswordResetTokenException extends RuntimeException {
+import ElFabrica.Wallet_pay.common.error.BusinessException;
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
 
-    private final String code;
+public class PasswordResetTokenException extends BusinessException {
 
-    public PasswordResetTokenException(String code, String message) {
-        super(message);
-        this.code = code;
-    }
-
-    public String getCode() {
-        return code;
+    public PasswordResetTokenException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
     }
 }

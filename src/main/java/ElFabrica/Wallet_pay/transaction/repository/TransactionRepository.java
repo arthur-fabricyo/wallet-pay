@@ -1,7 +1,9 @@
 package ElFabrica.Wallet_pay.transaction.repository;
 
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
+import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,8 +34,8 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
             select t
             from TransactionEntity t
             where (t.senderWallet.id = :walletId or t.receiverWallet.id = :walletId)
-              and (:from is null or t.createdAt >= :from)
-              and (:to is null or t.createdAt <= :to)
+              and (cast(:from as Instant) is null or t.createdAt >= :from)
+              and (cast(:to as Instant) is null or t.createdAt <= :to)
               and (:type is null or t.type = :type)
             """)
     Page<TransactionEntity> findStatementTransactions(
@@ -42,5 +44,39 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
             @Param("to") Instant to,
             @Param("type") TransactionType type,
             Pageable pageable
+    );
+
+    @Query("""
+            select sum(t.amount)
+            from TransactionEntity t
+            where t.senderWallet.id = :walletId
+              and t.type = :type
+              and t.status = :status
+              and t.createdAt >= :from
+              and t.createdAt <= :to
+            """)
+    BigDecimal sumOutgoingAmount(
+            @Param("walletId") UUID walletId,
+            @Param("type") TransactionType type,
+            @Param("status") TransactionStatus status,
+            @Param("from") Instant from,
+            @Param("to") Instant to
+    );
+
+    @Query("""
+            select sum(t.amount)
+            from TransactionEntity t
+            where t.receiverWallet.id = :walletId
+              and t.type = :type
+              and t.status = :status
+              and t.createdAt >= :from
+              and t.createdAt <= :to
+            """)
+    BigDecimal sumIncomingAmount(
+            @Param("walletId") UUID walletId,
+            @Param("type") TransactionType type,
+            @Param("status") TransactionStatus status,
+            @Param("from") Instant from,
+            @Param("to") Instant to
     );
 }

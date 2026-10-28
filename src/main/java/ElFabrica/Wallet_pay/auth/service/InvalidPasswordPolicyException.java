@@ -1,8 +1,17 @@
 package ElFabrica.Wallet_pay.auth.service;
 
-public class InvalidPasswordPolicyException extends RuntimeException {
+import ElFabrica.Wallet_pay.common.error.BusinessException;
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
+import java.util.Map;
+
+public class InvalidPasswordPolicyException extends BusinessException {
 
     public InvalidPasswordPolicyException(String message) {
-        super(message);
+        super(ErrorCode.INVALID_PASSWORD_POLICY, message);
+    }
+
+    @Override
+    public Map<String, String> getFields() {
+        return Map.of("newPassword", getMessage());
     }
 }
