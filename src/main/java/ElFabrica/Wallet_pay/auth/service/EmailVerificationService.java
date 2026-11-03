@@ -1,5 +1,9 @@
 package ElFabrica.Wallet_pay.auth.service;
 
+import ElFabrica.Wallet_pay.audit.AuditAction;
+import ElFabrica.Wallet_pay.audit.AuditEntry;
+import ElFabrica.Wallet_pay.audit.AuditLogger;
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
 import ElFabrica.Wallet_pay.auth.domain.EmailVerificationTokenEntity;
 import ElFabrica.Wallet_pay.auth.repository.EmailVerificationTokenRepository;
 import ElFabrica.Wallet_pay.user.domain.UserEntity;
@@ -8,6 +12,8 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,37 +21,45 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class EmailVerificationService implements EmailVerificationTokenIssuer {
 
-    public static final String TOKEN_INVALID = "EMAIL_VERIFICATION_TOKEN_INVALID";
-    public static final String TOKEN_EXPIRED = "EMAIL_VERIFICATION_TOKEN_EXPIRED";
-    public static final String TOKEN_ALREADY_USED = "EMAIL_VERIFICATION_TOKEN_ALREADY_USED";
-
     private static final int TOKEN_BYTES = 32;
 
     private final EmailVerificationTokenRepository tokenRepository;
     private final UserRepository userRepository;
     private final EmailVerificationSender emailVerificationSender;
+    private final AuditLogger auditLogger;
     private final SecureRandom secureRandom;
     private final Duration tokenTtl;
 
+    @Autowired
     public EmailVerificationService(
             EmailVerificationTokenRepository tokenRepository,
             UserRepository userRepository,
             EmailVerificationSender emailVerificationSender,
+            AuditLogger auditLogger,
             @Value("${wallet-pay.email-verification.token-ttl-hours:24}") long tokenTtlHours
     ) {
-        this(tokenRepository, userRepository, emailVerificationSender, new SecureRandom(), Duration.ofHours(tokenTtlHours));
+        this(
+                tokenRepository,
+                userRepository,
+                emailVerificationSender,
+                auditLogger,
+                new SecureRandom(),
+                Duration.ofHours(tokenTtlHours)
+        );
     }
 
     EmailVerificationService(
             EmailVerificationTokenRepository tokenRepository,
             UserRepository userRepository,
             EmailVerificationSender emailVerificationSender,
+            AuditLogger auditLogger,
             SecureRandom secureRandom,
             Duration tokenTtl
     ) {
         this.tokenRepository = tokenRepository;
         this.userRepository = userRepository;
         this.emailVerificationSender = emailVerificationSender;
+        this.auditLogger = auditLogger;
         this.secureRandom = secureRandom;
         this.tokenTtl = tokenTtl;
     }
@@ -86,15 +100,18 @@ public class EmailVerificationService implements EmailVerificationTokenIssuer {
 
         Instant now = Instant.now();
         if (token.isExpired(now)) {
-            throw new EmailVerificationTokenException(TOKEN_EXPIRED, "Token de verificacao expirado");
+            throw new EmailVerificationTokenException(ErrorCode.EMAIL_VERIFICATION_TOKEN_EXPIRED, "Token de verificacao expirado");
         }
 
         if (token.isUsed()) {
-            throw new EmailVerificationTokenException(TOKEN_ALREADY_USED, "Token de verificacao ja utilizado");
+            throw new EmailVerificationTokenException(ErrorCode.EMAIL_VERIFICATION_TOKEN_ALREADY_USED, "Token de verificacao ja utilizado");
         }
 
         token.markUsed(now);
-        token.getUser().markEmailVerified();
+        UserEntity user = token.getUser();
+        user.markEmailVerified();
+        auditLogger.record(AuditEntry.success(AuditAction.EMAIL_VERIFIED, user.getId(), Map.of())
+                .withActor(user.getId()));
     }
 
     private String generateToken() {
@@ -104,6 +121,6 @@ public class EmailVerificationService implements EmailVerificationTokenIssuer {
     }
 
     private EmailVerificationTokenException invalidToken(String message) {
-        return new EmailVerificationTokenException(TOKEN_INVALID, message);
+        return new EmailVerificationTokenException(ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID, message);
     }
 }

@@ -1,5 +1,6 @@
 package ElFabrica.Wallet_pay.auth.controllers;
 
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -204,7 +205,7 @@ class AuthControllerTest {
     @Test
     void shouldReturnBadRequestForInvalidEmailVerificationToken() throws Exception {
         emailVerificationService.confirmException = new EmailVerificationTokenException(
-                EmailVerificationService.TOKEN_INVALID,
+                ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID,
                 "Token de verificacao invalido"
         );
 
@@ -216,7 +217,7 @@ class AuthControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(EmailVerificationService.TOKEN_INVALID));
+                .andExpect(jsonPath("$.code").value("EMAIL_VERIFICATION_TOKEN_INVALID"));
     }
 
     @Test
@@ -252,7 +253,7 @@ class AuthControllerTest {
     @Test
     void shouldReturnBadRequestForInvalidPasswordResetToken() throws Exception {
         passwordRecoveryService.resetException = new PasswordResetTokenException(
-                PasswordRecoveryService.TOKEN_INVALID,
+                ErrorCode.PASSWORD_RESET_TOKEN_INVALID,
                 "Token de redefinicao de senha invalido"
         );
 
@@ -265,7 +266,7 @@ class AuthControllerTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(PasswordRecoveryService.TOKEN_INVALID));
+                .andExpect(jsonPath("$.code").value("PASSWORD_RESET_TOKEN_INVALID"));
     }
 
     @Test
@@ -367,7 +368,7 @@ class AuthControllerTest {
         private RuntimeException confirmException;
 
         FakeEmailVerificationService() {
-            super(null, null, null, 24);
+            super(null, null, null, null, 24);
         }
 
         @Override
@@ -398,7 +399,7 @@ class AuthControllerTest {
         private RuntimeException resetException;
 
         FakePasswordRecoveryService() {
-            super(null, null, null, null, null, 30);
+            super(null, null, null, null, null, null, 30);
         }
 
         @Override

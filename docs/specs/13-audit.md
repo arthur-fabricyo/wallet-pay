@@ -206,10 +206,13 @@ Entidade `audit/AuditRevisionEntity` anotada com `@RevisionEntity(AuditRevisionL
 ### Configuracao
 
 ```properties
-spring.jpa.properties.hibernate.envers.audit_table_suffix=_aud
-spring.jpa.properties.hibernate.envers.revision_field_name=rev
-spring.jpa.properties.hibernate.envers.revision_type_field_name=revtype
+spring.jpa.properties.org.hibernate.envers.audit_table_suffix=_aud
+spring.jpa.properties.org.hibernate.envers.revision_field_name=rev
+spring.jpa.properties.org.hibernate.envers.revision_type_field_name=revtype
+spring.jpa.properties.org.hibernate.envers.do_not_audit_optimistic_locking_field=false
 ```
+
+O prefixo `spring.jpa.properties.hibernate.envers.*` e ignorado pelo Envers; use `org.hibernate.envers.*`.
 
 ### Banco de Dados
 

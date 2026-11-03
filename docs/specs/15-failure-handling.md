@@ -66,8 +66,12 @@ Enum `common/error/ErrorCode`, onde cada valor conhece seu status HTTP:
 | `INVALID_PARAMETER` | 400 | Parametro ausente ou com tipo invalido |
 | `INVALID_AMOUNT` | 400 | Valor monetario invalido (spec 11) |
 | `INVALID_DOCUMENT` | 400 | CPF ou CNPJ invalido |
-| `INVALID_EMAIL_VERIFICATION_TOKEN` | 400 | Token de verificacao invalido ou expirado |
-| `INVALID_PASSWORD_RESET_TOKEN` | 400 | Token de redefinicao invalido ou expirado |
+| `EMAIL_VERIFICATION_TOKEN_INVALID` | 400 | Token de verificacao invalido (spec 04) |
+| `EMAIL_VERIFICATION_TOKEN_EXPIRED` | 400 | Token de verificacao expirado (spec 04) |
+| `EMAIL_VERIFICATION_TOKEN_ALREADY_USED` | 400 | Token de verificacao ja utilizado (spec 04) |
+| `PASSWORD_RESET_TOKEN_INVALID` | 400 | Token de redefinicao invalido (spec 05) |
+| `PASSWORD_RESET_TOKEN_EXPIRED` | 400 | Token de redefinicao expirado (spec 05) |
+| `PASSWORD_RESET_TOKEN_ALREADY_USED` | 400 | Token de redefinicao ja utilizado (spec 05) |
 | `INVALID_PASSWORD_POLICY` | 400 | Senha fora da politica |
 | `INVALID_TRANSFER` | 400 | Transferencia invalida, como para si mesmo |
 | `INVALID_STATEMENT_QUERY` | 400 | Filtro de extrato invalido |
@@ -94,6 +98,8 @@ Enum `common/error/ErrorCode`, onde cada valor conhece seu status HTTP:
 | `IDEMPOTENCY_KEY_REUSED` | 422 | Chave reutilizada com outro payload (spec 12) |
 | `INTERNAL_ERROR` | 500 | Erro inesperado |
 | `CNPJ_VALIDATION_UNAVAILABLE` | 503 | Servico de validacao de CNPJ indisponivel |
+
+Os codes de token mantem o contrato das specs 04 e 05.
 
 ## Regras
 
