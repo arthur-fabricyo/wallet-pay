@@ -1,8 +1,11 @@
 package ElFabrica.Wallet_pay.transaction.service;
 
-public class TransactionNotFoundException extends RuntimeException {
+import ElFabrica.Wallet_pay.common.error.BusinessException;
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
+
+public class TransactionNotFoundException extends BusinessException {
 
     public TransactionNotFoundException(String message) {
-        super(message);
+        super(ErrorCode.TRANSACTION_NOT_FOUND, message);
     }
 }

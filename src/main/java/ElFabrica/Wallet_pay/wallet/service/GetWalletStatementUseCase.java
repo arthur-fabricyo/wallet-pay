@@ -1,12 +1,11 @@
 package ElFabrica.Wallet_pay.wallet.service;
 
+import ElFabrica.Wallet_pay.common.money.Money;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
 import ElFabrica.Wallet_pay.transaction.repository.TransactionRepository;
 import ElFabrica.Wallet_pay.wallet.domain.WalletEntity;
 import ElFabrica.Wallet_pay.wallet.repository.WalletRepository;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.UUID;
@@ -56,17 +55,18 @@ public class GetWalletStatementUseCase {
     }
 
     private StatementEntryResult entry(UUID walletId, TransactionEntity transaction) {
-        boolean outgoing = transaction.getSenderWallet().getId().equals(walletId);
-        WalletEntity counterparty = outgoing ? transaction.getReceiverWallet() : transaction.getSenderWallet();
+        WalletEntity senderWallet = transaction.getSenderWallet();
+        boolean outgoing = senderWallet != null && senderWallet.getId().equals(walletId);
+        WalletEntity counterparty = outgoing ? transaction.getReceiverWallet() : senderWallet;
 
         return new StatementEntryResult(
                 transaction.getId(),
                 transaction.getType(),
                 transaction.getStatus(),
                 outgoing ? StatementDirection.OUT : StatementDirection.IN,
-                money(transaction.getAmount()),
+                Money.format(transaction.getAmount()),
                 transaction.getCurrency(),
-                counterparty.getUser().getName(),
+                counterparty == null ? null : counterparty.getUser().getName(),
                 transaction.getDescription(),
                 transaction.getCreatedAt(),
                 transaction.getCompletedAt()
@@ -129,10 +129,6 @@ public class GetWalletStatementUseCase {
 
     private String blankToDefault(String value, String defaultValue) {
         return value == null || value.isBlank() ? defaultValue : value;
-    }
-
-    private String money(BigDecimal amount) {
-        return amount.setScale(2, RoundingMode.UNNECESSARY).toPlainString();
     }
 
     private record ValidStatementQuery(

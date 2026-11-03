@@ -1,10 +1,14 @@
 package ElFabrica.Wallet_pay.user.service;
 
+import ElFabrica.Wallet_pay.audit.AuditAction;
+import ElFabrica.Wallet_pay.audit.AuditEntry;
+import ElFabrica.Wallet_pay.audit.AuditLogger;
 import ElFabrica.Wallet_pay.auth.service.EmailVerificationTokenIssuer;
 import ElFabrica.Wallet_pay.user.domain.UserEntity;
 import ElFabrica.Wallet_pay.user.repository.UserRepository;
 import ElFabrica.Wallet_pay.wallet.domain.WalletEntity;
 import ElFabrica.Wallet_pay.wallet.repository.WalletRepository;
+import java.util.Map;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,19 +25,22 @@ public class RegisterUserUseCase {
     private final PasswordEncoder passwordEncoder;
     private final CnpjValidatorGateway cnpjValidatorGateway;
     private final EmailVerificationTokenIssuer emailVerificationTokenIssuer;
+    private final AuditLogger auditLogger;
 
     public RegisterUserUseCase(
             UserRepository userRepository,
             WalletRepository walletRepository,
             PasswordEncoder passwordEncoder,
             CnpjValidatorGateway cnpjValidatorGateway,
-            EmailVerificationTokenIssuer emailVerificationTokenIssuer
+            EmailVerificationTokenIssuer emailVerificationTokenIssuer,
+            AuditLogger auditLogger
     ) {
         this.userRepository = userRepository;
         this.walletRepository = walletRepository;
         this.passwordEncoder = passwordEncoder;
         this.cnpjValidatorGateway = cnpjValidatorGateway;
         this.emailVerificationTokenIssuer = emailVerificationTokenIssuer;
+        this.auditLogger = auditLogger;
     }
 
     @Transactional
@@ -51,6 +58,8 @@ public class RegisterUserUseCase {
             UserEntity savedUser = userRepository.saveAndFlush(user);
             walletRepository.saveAndFlush(new WalletEntity(savedUser));
             emailVerificationTokenIssuer.issueFor(savedUser);
+            auditLogger.record(AuditEntry.success(AuditAction.USER_REGISTERED, savedUser.getId(), Map.of())
+                    .withActor(savedUser.getId()));
 
             return new RegisterUserResult(
                     savedUser.getId(),

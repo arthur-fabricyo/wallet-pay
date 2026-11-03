@@ -13,9 +13,11 @@ import java.util.UUID;
 
 import lombok.Getter;
 import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.NotAudited;
 
 @Entity
-
+@Audited
 @Table(
         name = "users",
         uniqueConstraints = {
@@ -36,6 +38,7 @@ public class UserEntity {
     @Column(nullable = false, length = 254)
     private String email;
 
+    @NotAudited
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
 

@@ -108,6 +108,38 @@ class GetReceiptUseCaseTest {
                 .isInstanceOf(ReceiptUnavailableException.class);
     }
 
+    @Test
+    void shouldRefuseReceiptForDeposit() {
+        UUID userId = UUID.randomUUID();
+        TransactionEntity deposit = TransactionEntity.completedDeposit(
+                wallet(userId, "Joao Silva", "52998224725"),
+                new BigDecimal("150.00"),
+                null,
+                Instant.parse("2026-10-15T13:00:00Z")
+        );
+        setField(deposit, "id", UUID.randomUUID());
+        GetReceiptUseCase useCase = new GetReceiptUseCase(new FakeTransactionRepository(deposit).proxy());
+
+        assertThatThrownBy(() -> useCase.getReceipt(userId, deposit.getId()))
+                .isInstanceOf(ReceiptUnavailableException.class)
+                .hasMessage("Comprovante disponivel apenas para transferencias");
+    }
+
+    @Test
+    void shouldDenyDepositReceiptToAnotherUserWithoutFailingOnMissingSender() {
+        TransactionEntity deposit = TransactionEntity.completedDeposit(
+                wallet(UUID.randomUUID(), "Joao Silva", "52998224725"),
+                new BigDecimal("150.00"),
+                null,
+                Instant.parse("2026-10-15T13:00:00Z")
+        );
+        setField(deposit, "id", UUID.randomUUID());
+        GetReceiptUseCase useCase = new GetReceiptUseCase(new FakeTransactionRepository(deposit).proxy());
+
+        assertThatThrownBy(() -> useCase.getReceipt(UUID.randomUUID(), deposit.getId()))
+                .isInstanceOf(ReceiptAccessDeniedException.class);
+    }
+
     private static TransactionEntity transaction(
             UUID transactionId,
             WalletEntity senderWallet,
@@ -118,7 +150,8 @@ class GetReceiptUseCaseTest {
                 senderWallet,
                 receiverWallet,
                 new BigDecimal("25.50"),
-                "Almoco"
+                "Almoco",
+                now
         );
         setField(transaction, "id", transactionId);
         setField(transaction, "createdAt", now);

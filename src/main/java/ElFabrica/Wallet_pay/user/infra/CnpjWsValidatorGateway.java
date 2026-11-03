@@ -3,6 +3,7 @@ package ElFabrica.Wallet_pay.user.infra;
 import ElFabrica.Wallet_pay.user.service.CnpjValidationUnavailableException;
 import ElFabrica.Wallet_pay.user.service.CnpjValidatorGateway;
 import java.net.SocketTimeoutException;
+import java.net.http.HttpTimeoutException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -46,10 +47,19 @@ public class CnpjWsValidatorGateway implements CnpjValidatorGateway {
 
             throw new CnpjValidationUnavailableException("Nao foi possivel validar o CNPJ", exception);
         } catch (RestClientException exception) {
-            if (exception.getCause() instanceof SocketTimeoutException) {
+            if (isTimeout(exception)) {
                 throw new CnpjValidationUnavailableException("Tempo esgotado ao validar o CNPJ", exception);
             }
             throw new CnpjValidationUnavailableException("Nao foi possivel validar o CNPJ", exception);
         }
+    }
+
+    private static boolean isTimeout(Throwable exception) {
+        for (Throwable cause = exception; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SocketTimeoutException || cause instanceof HttpTimeoutException) {
+                return true;
+            }
+        }
+        return false;
     }
 }

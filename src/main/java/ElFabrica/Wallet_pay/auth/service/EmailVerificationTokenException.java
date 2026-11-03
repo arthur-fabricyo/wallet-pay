@@ -1,15 +1,11 @@
 package ElFabrica.Wallet_pay.auth.service;
 
-public class EmailVerificationTokenException extends RuntimeException {
+import ElFabrica.Wallet_pay.common.error.BusinessException;
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
 
-    private final String code;
+public class EmailVerificationTokenException extends BusinessException {
 
-    public EmailVerificationTokenException(String code, String message) {
-        super(message);
-        this.code = code;
-    }
-
-    public String getCode() {
-        return code;
+    public EmailVerificationTokenException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
     }
 }

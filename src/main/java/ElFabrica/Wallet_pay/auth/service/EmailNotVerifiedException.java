@@ -1,8 +1,11 @@
 package ElFabrica.Wallet_pay.auth.service;
 
-public class EmailNotVerifiedException extends RuntimeException {
+import ElFabrica.Wallet_pay.common.error.BusinessException;
+import ElFabrica.Wallet_pay.common.error.ErrorCode;
+
+public class EmailNotVerifiedException extends BusinessException {
 
     public EmailNotVerifiedException(String message) {
-        super(message);
+        super(ErrorCode.EMAIL_NOT_VERIFIED, message);
     }
 }
