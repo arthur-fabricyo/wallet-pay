@@ -63,6 +63,12 @@ public class IntegrationTestConfiguration {
 
     @Bean
     @Primary
+    CapturingPushGateway capturingPushGateway() {
+        return new CapturingPushGateway();
+    }
+
+    @Bean
+    @Primary
     MutableClock mutableClock() {
         return new MutableClock();
     }

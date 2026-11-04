@@ -55,9 +55,9 @@ public class TransferCompletedHandler implements EventHandler {
     public void handle(DomainEvent event) {
         TransferCompletedPayload payload = jsonMapper.treeToValue(event.payload(), TransferCompletedPayload.class);
         Optional<String> senderName = userRepository.findById(payload.senderUserId())
-                .map(user -> user.getName());
+                .map(user -> displayName(user.getName()));
         Optional<String> receiverName = userRepository.findById(payload.receiverUserId())
-                .map(user -> user.getName());
+                .map(user -> displayName(user.getName()));
         if (senderName.isEmpty() || receiverName.isEmpty()) {
             log.warn("Dropping event {}: transfer {} references an unknown user", event.eventId(),
                     payload.transactionId());
@@ -81,6 +81,11 @@ public class TransferCompletedHandler implements EventHandler {
                 "Transferência recebida",
                 "Você recebeu " + amount + " de " + senderName.get() + " em " + when + "."
         ));
+    }
+
+    /** Names are user-controlled: flatten control characters (line breaks) so they stay on one line in any channel. */
+    private static String displayName(String name) {
+        return name.replaceAll("\\p{Cntrl}+", " ").trim();
     }
 
     private static String formatBrl(String amount) {

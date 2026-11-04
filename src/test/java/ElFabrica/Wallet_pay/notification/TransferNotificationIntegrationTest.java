@@ -2,75 +2,33 @@ package ElFabrica.Wallet_pay.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ElFabrica.Wallet_pay.common.event.DomainEvent;
-import ElFabrica.Wallet_pay.notification.channel.NotificationChannel;
-import ElFabrica.Wallet_pay.notification.push.PushGateway;
+import ElFabrica.Wallet_pay.notification.channel.EmailChannel;
 import ElFabrica.Wallet_pay.notification.push.PushMessage;
 import ElFabrica.Wallet_pay.notification.service.TransferCompletedHandler;
 import ElFabrica.Wallet_pay.support.AbstractIntegrationTest;
+import ElFabrica.Wallet_pay.support.CapturingPushGateway;
 import ElFabrica.Wallet_pay.support.TestUser;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import tools.jackson.databind.json.JsonMapper;
 
-@Import(TransferNotificationIntegrationTest.CaptureConfig.class)
 class TransferNotificationIntegrationTest extends AbstractIntegrationTest {
-
-    static class CapturingPushGateway implements PushGateway {
-        final List<PushMessage> sent = new CopyOnWriteArrayList<>();
-
-        @Override
-        public void send(PushMessage message) {
-            sent.add(message);
-        }
-    }
-
-    static class RecordingEmailChannel implements NotificationChannel {
-        final List<Notification> delivered = new CopyOnWriteArrayList<>();
-        final AtomicBoolean failNext = new AtomicBoolean();
-
-        @Override
-        public NotificationChannelType type() {
-            return NotificationChannelType.EMAIL;
-        }
-
-        @Override
-        public void deliver(Notification notification) {
-            if (failNext.getAndSet(false)) {
-                throw new IllegalStateException("smtp down");
-            }
-            delivered.add(notification);
-        }
-    }
-
-    @TestConfiguration(proxyBeanMethods = false)
-    static class CaptureConfig {
-        @Bean
-        @Primary
-        CapturingPushGateway capturingPushGateway() {
-            return new CapturingPushGateway();
-        }
-
-        @Bean
-        RecordingEmailChannel recordingEmailChannel() {
-            return new RecordingEmailChannel();
-        }
-    }
 
     @Autowired
     private TransferCompletedHandler handler;
@@ -78,8 +36,8 @@ class TransferNotificationIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private CapturingPushGateway pushGateway;
 
-    @Autowired
-    private RecordingEmailChannel emailChannel;
+    @MockitoSpyBean
+    private EmailChannel emailChannel;
 
     @Autowired
     private JsonMapper jsonMapper;
@@ -87,8 +45,7 @@ class TransferNotificationIntegrationTest extends AbstractIntegrationTest {
     @BeforeEach
     void resetCaptures() {
         pushGateway.sent.clear();
-        emailChannel.delivered.clear();
-        emailChannel.failNext.set(false);
+        Mockito.reset(emailChannel);
     }
 
     private DomainEvent transferEvent(UUID senderUserId, UUID receiverUserId) {
@@ -142,8 +99,9 @@ class TransferNotificationIntegrationTest extends AbstractIntegrationTest {
 
         handler.handle(transferEvent(ana.userId(), bruno.userId()));
 
-        assertThat(emailChannel.delivered).singleElement()
-                .satisfies(notification -> assertThat(notification.userId()).isEqualTo(bruno.userId()));
+        ArgumentCaptor<Notification> delivered = ArgumentCaptor.forClass(Notification.class);
+        verify(emailChannel, times(1)).deliver(delivered.capture());
+        assertThat(delivered.getValue().userId()).isEqualTo(bruno.userId());
     }
 
     @Test
@@ -157,7 +115,7 @@ class TransferNotificationIntegrationTest extends AbstractIntegrationTest {
         handler.handle(event);
 
         assertThat(pushGateway.sent).hasSize(2);
-        assertThat(emailChannel.delivered).hasSize(1);
+        verify(emailChannel, times(1)).deliver(any());
     }
 
     @Test
@@ -166,13 +124,13 @@ class TransferNotificationIntegrationTest extends AbstractIntegrationTest {
         TestUser bruno = createVerifiedUser("Bruno Lima", "0.00");
         enableEmail(bruno);
         DomainEvent event = transferEvent(ana.userId(), bruno.userId());
-        emailChannel.failNext.set(true);
+        doThrow(new IllegalStateException("smtp down")).doCallRealMethod().when(emailChannel).deliver(any());
 
         assertThatThrownBy(() -> handler.handle(event)).isInstanceOf(IllegalStateException.class);
         handler.handle(event);
 
         assertThat(pushGateway.sent).hasSize(2);
-        assertThat(emailChannel.delivered).hasSize(1);
+        verify(emailChannel, times(2)).deliver(any());
     }
 
     @Test
