@@ -29,7 +29,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@SpringBootTest
+@SpringBootTest(properties = "walletpay.events.outbox.poll-delay=PT1H")
 @AutoConfigureMockMvc
 @Import(IntegrationTestConfiguration.class)
 public abstract class AbstractIntegrationTest {

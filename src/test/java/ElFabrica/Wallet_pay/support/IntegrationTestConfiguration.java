@@ -7,7 +7,11 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.test.context.DynamicPropertyRegistrar;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.rabbitmq.RabbitMQContainer;
 
 @TestConfiguration(proxyBeanMethods = false)
 public class IntegrationTestConfiguration {
@@ -16,6 +20,32 @@ public class IntegrationTestConfiguration {
     @ServiceConnection
     PostgreSQLContainer postgresContainer() {
         return new PostgreSQLContainer("postgres:16-alpine");
+    }
+
+    @Bean
+    @ServiceConnection
+    RabbitMQContainer rabbitContainer() {
+        return new RabbitMQContainer("rabbitmq:3-management-alpine");
+    }
+
+    @Bean
+    GenericContainer<?> mailpitContainer() {
+        return new GenericContainer<>("axllent/mailpit")
+                .withExposedPorts(1025, 8025)
+                .waitingFor(Wait.forHttp("/livez").forPort(8025));
+    }
+
+    @Bean
+    DynamicPropertyRegistrar mailpitProperties(GenericContainer<?> mailpitContainer) {
+        return registry -> {
+            registry.add("spring.mail.host", mailpitContainer::getHost);
+            registry.add("spring.mail.port", () -> mailpitContainer.getMappedPort(1025));
+        };
+    }
+
+    @Bean
+    MailpitClient mailpitClient(GenericContainer<?> mailpitContainer) {
+        return new MailpitClient("http://" + mailpitContainer.getHost() + ":" + mailpitContainer.getMappedPort(8025));
     }
 
     @Bean

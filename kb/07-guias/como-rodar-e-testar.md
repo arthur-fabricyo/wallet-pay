@@ -13,6 +13,8 @@ docker compose up -d
 ```
 
 Sobe `postgres:16-alpine` (`wallet-pay-postgres`) na porta 5432, banco/usuário/senha `wallet_pay`, volume `wallet_pay_postgres_data`.
+Também sobe o **RabbitMQ** (AMQP `5672`; console `http://localhost:15672`, guest/guest) e o **Mailpit** (SMTP `1025`; caixa de entrada
+web `http://localhost:8025`), usados pelas notificações da Fase 3.
 Para recriar do zero (ex.: migration alterada): `docker compose down -v`.
 
 ## Aplicação
