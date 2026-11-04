@@ -34,6 +34,9 @@ Para recriar do zero (ex.: migration alterada): `docker compose down -v`.
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `wallet_pay` |
 | `JWT_SECRET` | segredo de desenvolvimento — **troque fora do ambiente local** |
 | `CNPJ_WS_BASE_URL` | `https://publica.cnpj.ws` |
+| `SPRING_RABBITMQ_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | `localhost` / `5672` / `guest` / `guest` |
+| `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` | `localhost` / `1025` |
+| `WALLETPAY_EMAIL_FROM` | `no-reply@walletpay.local` |
 
 Limites de operação: `walletpay.limits.*` em `application.properties` (ver [operações de saldo](../03-arquitetura/operacoes-de-saldo.md)).
 
@@ -43,7 +46,8 @@ Limites de operação: `walletpay.limits.*` em `application.properties` (ver [op
 ./mvnw test
 ```
 
-Docker precisa estar rodando (Testcontainers sobe um PostgreSQL novo; não usa o banco do Compose).
+Docker precisa estar rodando (Testcontainers sobe PostgreSQL, RabbitMQ e Mailpit próprios, uma vez por execução; não usa os
+serviços do Compose). A suíte leva alguns minutos e consome memória: feche outros containers pesados antes de rodar.
 
 ### Nota sobre `JAVA_HOME`
 

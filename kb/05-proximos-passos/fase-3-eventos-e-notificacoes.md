@@ -1,6 +1,14 @@
-# Fase 3 — Eventos e notificações (proposta de escopo)
+# Fase 3 — Eventos e notificações
 
-> **Proposta.** Baseada em [`docs/core.md` §7–8](../../docs/core.md) e no código atual. Ainda não existem specs para esta fase.
+> **Status: MVP entregue em 2026-11-04** (design em `docs/superpowers/specs/2026-11-04-notificacoes-design.md`, plano em
+> `docs/superpowers/plans/2026-11-04-notificacoes.md`). Entregue: outbox transacional, publicador agendado, RabbitMQ atrás de
+> portas (`EventPublisher`/`EventHandler`, tópico `walletpay.events`, fila + DLQ por consumidor), evento `TransferCompleted`,
+> notificações push (porta `PushGateway`, stub em log) e e-mail opcional (`EmailSender` SMTP compartilhado), preferências por
+> usuário (`notification_preferences`), idempotência de entrega por (evento, usuário, canal). **Ainda pendente:** `MoneyReceived`/
+> `BalanceUpdated` e depósito, histórico de notificações, DLQ consultável, métricas, migrar `Logging*Sender`, push real.
+> O texto abaixo é a proposta original.
+
+> **Proposta original.** Baseada em [`docs/core.md` §7–8](../../docs/core.md) e no código atual. Ainda não existem specs para esta fase.
 > Itens marcados *(sugestão)* são recomendações minhas, não decisões do projeto.
 
 ## Objetivo

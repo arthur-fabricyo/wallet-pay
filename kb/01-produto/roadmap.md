@@ -5,8 +5,8 @@ Roadmap original em [`docs/core.md` §8](../../docs/core.md). Legenda: ✅ feito
 | Fase | Tema | Status | Observação |
 |---|---|---|---|
 | 1 | Núcleo da carteira | ✅ | Specs 01–09. Ver [detalhe](../02-andamento/fase-1-nucleo-da-carteira.md) |
-| 2 | Segurança e confiabilidade | ✅ | Specs 10–15. Ver [detalhe](../02-andamento/fase-2-seguranca-e-confiabilidade.md). Falta merge em `main` |
-| 3 | Eventos e notificações | ⬜ | RabbitMQ, eventos de domínio, retentativas/DLQ, métricas. Ver [detalhe](../05-proximos-passos/fase-3-eventos-e-notificacoes.md) |
+| 2 | Segurança e confiabilidade | ✅ | Specs 10–15. Ver [detalhe](../02-andamento/fase-2-seguranca-e-confiabilidade.md). Já em `dev` (PRs #1 e #2); falta `dev` → `main` |
+| 3 | Eventos e notificações | 🟡 | **MVP entregue:** outbox, RabbitMQ atrás de portas, retentativas/DLQ, push (stub) e e-mail opcional para transferência. Faltam depósito/outros eventos, histórico, DLQ consultável e métricas. Ver [detalhe](../05-proximos-passos/fase-3-eventos-e-notificacoes.md) |
 | 4 | Motor de automações | ⬜ | **Diferencial do produto.** Depende dos eventos da Fase 3 |
 | 5 | Organização financeira | ⬜ | Cofres/metas, orçamentos, alertas, recorrentes |
 | 6 | Pagamentos simulados | ⬜ | Pix simulado, QR Code, webhook idempotente |

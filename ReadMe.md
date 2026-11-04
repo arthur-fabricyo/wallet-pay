@@ -8,12 +8,17 @@ as especificações de cada funcionalidade estão em [`docs/specs`](docs/specs).
 
 ## O que a aplicação já entrega
 
+### Notificações
+- Ao concluir uma transferência, remetente e destinatário recebem uma notificação **push** (hoje só registrada em log; a entrega real virá com o app).
+- **E-mail** é um canal opcional: cada usuário habilita em `PUT /notifications/preferences/EMAIL`; `GET /notifications/preferences` mostra o estado.
+- Os eventos passam por um outbox transacional e pelo RabbitMQ, atrás de portas que permitem trocar o broker. Para ver os e-mails em desenvolvimento, suba o Compose e abra o Mailpit em http://localhost:8025.
+
 ### Usuários e autenticação
 - Cadastro de usuário com CPF (validação dos dígitos verificadores) ou CNPJ (consulta ao CNPJ.ws); cada usuário recebe uma carteira em BRL.
 - Verificação de e-mail obrigatória antes do login, com reenvio do token.
 - Login com JWT (access token de 20 minutos) e refresh token (7 dias), renovação e logout.
 - Recuperação de senha por token.
-- Os e-mails ainda são simulados: os tokens são escritos no log da aplicação.
+- Os e-mails de verificação e recuperação ainda são simulados: os tokens são escritos no log da aplicação.
 
 ### Carteira
 - Consulta de saldo.
@@ -87,9 +92,9 @@ Os limites de operação são configurados em `application.properties` (`walletp
 ./mvnw test
 ```
 
-Os testes de integração sobem um PostgreSQL via Testcontainers, então o Docker precisa estar rodando.
+Os testes de integração sobem PostgreSQL, RabbitMQ e Mailpit via Testcontainers, então o Docker precisa estar rodando.
 
 ## Próximos passos
 
-Pelo [roadmap](docs/core.md#8-roadmap-sugerido): eventos e notificações (Fase 3), motor de automações (Fase 4),
+Pelo [roadmap](docs/core.md#8-roadmap-sugerido): conclusão da Fase 3 (depósito e outros eventos, histórico de notificações), motor de automações (Fase 4),
 organização financeira (Fase 5), pagamentos simulados via Pix (Fase 6) e aplicativo Android (Fase 7).

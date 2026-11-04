@@ -9,7 +9,7 @@ Origem: "fora de escopo" das specs, `docs/core.md` §5 e o estado do repositóri
 |---|---|---|---|
 | 1 | Mergear `feat/fases-1-2` em `main` | 🔴 | Branch 22 commits à frente; nasceu de `docs/specs-fase-1-2`, que também precisa entrar. Decidir: PR único ou squash |
 | 2 | Atualizar o plano `2026-10-15-fases-1-2.md` | 🟢 | 105 checkboxes ainda `- [ ]` apesar de tudo implementado; marcar ou mover para "concluídos" |
-| 3 | Executar a suíte completa e registrar o resultado | 🔴 | A KB só conta `@Test`; confirmar verde (`./mvnw test`) antes do merge |
+| 3 | Executar a suíte completa e registrar o resultado | ✅ | 293 testes verdes em 2026-11-04 (`./mvnw test`) |
 | 4 | Revisar specs vs. implementação | 🟢 | O plano ajustou a spec 15 (códigos de token). Refletir os 11 ajustes de [decisões](../06-decisoes/decisoes-tecnicas.md) nas specs |
 
 ## Segurança
@@ -27,7 +27,9 @@ Origem: "fora de escopo" das specs, `docs/core.md` §5 e o estado do repositóri
 
 | # | Item | Prio | Detalhe |
 |---|---|---|---|
-| 11 | Provedor real de e-mail | 🟡 | Hoje o token é escrito no log. Natural na Fase 3 (notificações) |
+| 11 | Migrar verificação/recuperação de senha para o `EmailSender` | 🟡 | `EmailSender` SMTP compartilhado já existe (Fase 3); `LoggingEmailVerificationSender`/`LoggingPasswordRecoverySender` ainda só escrevem em log. Provedor transacional de produção também em aberto |
+| 11b | Histórico de notificações, DLQ consultável, métricas de eventos | 🟡 | Fora do MVP da Fase 3 |
+| 11c | Push real | 🟡 | Contrato `PushGateway` pronto; implementação (FCM) na Fase 7 |
 | 12 | Templates finais de e-mail | 🟢 | Specs 04/05 |
 | 13 | Estorno e saque | 🟡 | Fora de escopo das specs 06/11; exigem novos tipos de transação, status e auditoria |
 | 14 | Status `PENDING` vs. check do banco | 🟡 | `ck_transactions_status` só aceita `COMPLETED`/`FAILED`; ajustar via migration antes de fluxos assíncronos (Fase 6) |
