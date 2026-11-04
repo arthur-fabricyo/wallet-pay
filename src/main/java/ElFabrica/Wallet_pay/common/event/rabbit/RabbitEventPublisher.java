@@ -20,10 +20,12 @@ public class RabbitEventPublisher implements EventPublisher {
 
     private final RabbitTemplate rabbitTemplate;
     private final JsonMapper jsonMapper;
+    private final RabbitTopology topology;
 
-    public RabbitEventPublisher(RabbitTemplate rabbitTemplate, JsonMapper jsonMapper) {
+    public RabbitEventPublisher(RabbitTemplate rabbitTemplate, JsonMapper jsonMapper, RabbitTopology topology) {
         this.rabbitTemplate = rabbitTemplate;
         this.jsonMapper = jsonMapper;
+        this.topology = topology;
     }
 
     @Override
@@ -39,6 +41,6 @@ public class RabbitEventPublisher implements EventPublisher {
         }
         Message message = builder.build();
 
-        rabbitTemplate.send(RabbitTopology.EXCHANGE, event.type(), message);
+        rabbitTemplate.send(topology.exchange(), event.type(), message);
     }
 }

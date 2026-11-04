@@ -16,23 +16,30 @@ import org.testcontainers.rabbitmq.RabbitMQContainer;
 @TestConfiguration(proxyBeanMethods = false)
 public class IntegrationTestConfiguration {
 
+    // One set of containers for the whole test JVM: every distinct Spring context (tests with their own nested
+    // configuration get their own cached context) reuses them instead of starting a new Postgres/RabbitMQ/Mailpit.
+    // Contexts stay isolated on the broker through a per-context walletpay.events.namespace.
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
+    private static final RabbitMQContainer RABBIT = new RabbitMQContainer("rabbitmq:3-management-alpine");
+    private static final GenericContainer<?> MAILPIT = new GenericContainer<>("axllent/mailpit")
+            .withExposedPorts(1025, 8025)
+            .waitingFor(Wait.forHttp("/livez").forPort(8025));
+
     @Bean
     @ServiceConnection
     PostgreSQLContainer postgresContainer() {
-        return new PostgreSQLContainer("postgres:16-alpine");
+        return POSTGRES;
     }
 
     @Bean
     @ServiceConnection
     RabbitMQContainer rabbitContainer() {
-        return new RabbitMQContainer("rabbitmq:3-management-alpine");
+        return RABBIT;
     }
 
     @Bean
     GenericContainer<?> mailpitContainer() {
-        return new GenericContainer<>("axllent/mailpit")
-                .withExposedPorts(1025, 8025)
-                .waitingFor(Wait.forHttp("/livez").forPort(8025));
+        return MAILPIT;
     }
 
     @Bean

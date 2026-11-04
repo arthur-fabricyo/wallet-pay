@@ -32,23 +32,25 @@ public class RabbitEventConsumerConfig implements RabbitListenerConfigurer {
 
     private final List<EventHandler> handlers;
     private final JsonMapper jsonMapper;
+    private final RabbitTopology topology;
 
-    public RabbitEventConsumerConfig(List<EventHandler> handlers, JsonMapper jsonMapper) {
+    public RabbitEventConsumerConfig(List<EventHandler> handlers, JsonMapper jsonMapper, RabbitTopology topology) {
         this.handlers = handlers;
         this.jsonMapper = jsonMapper;
+        this.topology = topology;
     }
 
     @Bean
     TopicExchange walletPayEventsExchange() {
-        return new TopicExchange(RabbitTopology.EXCHANGE, true, false);
+        return new TopicExchange(topology.exchange(), true, false);
     }
 
     @Bean
     Declarables eventHandlerQueues(TopicExchange walletPayEventsExchange) {
         List<Declarable> declarables = new ArrayList<>();
         for (EventHandler handler : handlers) {
-            String queueName = RabbitTopology.queueName(handler);
-            String dlqName = RabbitTopology.deadLetterQueueName(handler);
+            String queueName = topology.queueName(handler);
+            String dlqName = topology.deadLetterQueueName(handler);
 
             Queue dlq = QueueBuilder.durable(dlqName).build();
             Queue queue = QueueBuilder.durable(queueName)
@@ -68,8 +70,8 @@ public class RabbitEventConsumerConfig implements RabbitListenerConfigurer {
     public void configureRabbitListeners(RabbitListenerEndpointRegistrar registrar) {
         for (EventHandler handler : handlers) {
             SimpleRabbitListenerEndpoint endpoint = new SimpleRabbitListenerEndpoint();
-            endpoint.setId("event-handler-" + RabbitTopology.queueName(handler));
-            endpoint.setQueueNames(RabbitTopology.queueName(handler));
+            endpoint.setId("event-handler-" + topology.queueName(handler));
+            endpoint.setQueueNames(topology.queueName(handler));
             endpoint.setMessageListener(listenerFor(handler));
             registrar.registerEndpoint(endpoint);
         }

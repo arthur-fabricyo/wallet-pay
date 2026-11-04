@@ -108,11 +108,20 @@ class RabbitEventAdapterIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     private JsonMapper jsonMapper;
 
+    @Autowired
+    private RabbitTopology topology;
+
+    private String dlq() {
+        return topology.deadLetterQueueName("adapter-test", "AdapterFailing");
+    }
+
     @BeforeEach
     void purge() {
         for (String queue : List.of(
-                "walletpay.adapter-test.AdapterSample", "walletpay.adapter-test.AdapterOther",
-                "walletpay.adapter-test.AdapterFailing", "walletpay.adapter-test.AdapterFailing.dlq")) {
+                topology.queueName("adapter-test", "AdapterSample"),
+                topology.queueName("adapter-test", "AdapterOther"),
+                topology.queueName("adapter-test", "AdapterFailing"),
+                dlq())) {
             rabbitAdmin.purgeQueue(queue, true);
         }
         adapterSampleHandler.received.clear();
@@ -155,7 +164,7 @@ class RabbitEventAdapterIntegrationTest extends AbstractIntegrationTest {
         publisher.publish(event("AdapterFailing", null));
 
         await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
-            Message dead = rabbitTemplate.receive("walletpay.adapter-test.AdapterFailing.dlq");
+            Message dead = rabbitTemplate.receive(dlq());
             assertThat(dead).isNotNull();
         });
     }

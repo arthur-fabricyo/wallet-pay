@@ -2,11 +2,10 @@ package ElFabrica.Wallet_pay.notification.push;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
+/** Default stub. The real implementation (Fase 7) should be declared @Primary to take over. */
 @Component
-@ConditionalOnMissingBean(PushGateway.class)
 public class LoggingPushGateway implements PushGateway {
 
     private static final Logger log = LoggerFactory.getLogger(LoggingPushGateway.class);
