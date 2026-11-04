@@ -54,6 +54,14 @@ public class IntegrationTestConfiguration {
         return new CapturingEmailVerificationSender();
     }
 
+    // Provisional (Task 3): no production EventPublisher exists until the RabbitMQ adapter lands in Task 4.
+    @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean(
+            ElFabrica.Wallet_pay.common.event.EventPublisher.class)
+    ElFabrica.Wallet_pay.common.event.EventPublisher provisionalEventPublisher() {
+        return event -> { };
+    }
+
     @Bean
     @Primary
     MutableClock mutableClock() {
