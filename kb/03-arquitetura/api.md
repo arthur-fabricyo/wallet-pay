@@ -21,6 +21,8 @@ Documentação interativa (app rodando): `http://localhost:8080/swagger-ui.html`
 | `PUT` | `/wallets/me/limits` | JWT | Substituir limites personalizados (só reduzir) | 14 |
 | `POST` | `/transactions/transfers` | JWT + `Idempotency-Key` | Transferência | 06, 12 |
 | `GET` | `/transactions/{transactionId}/receipt` | JWT | Comprovante (só transferências; só participantes) | 07 |
+| `GET` | `/notifications/preferences` | JWT | Preferências de notificação por canal (push sempre ligado; e-mail desligado por padrão) | Fase 3 |
+| `PUT` | `/notifications/preferences/{channel}` | JWT | Habilitar/desabilitar e-mail (`{"enabled": true}`); `PUSH` não é alterável (400) | Fase 3 |
 | `GET` | `/actuator/health` | pública | Saúde da aplicação | — |
 
 ## Convenções de contrato
