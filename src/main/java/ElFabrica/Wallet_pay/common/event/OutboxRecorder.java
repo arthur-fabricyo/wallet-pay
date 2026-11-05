@@ -29,8 +29,9 @@ public class OutboxRecorder {
         String requestId = event.requestId() != null ? event.requestId() : MDC.get(RequestIdFilter.MDC_KEY);
 
         jdbcClient.sql("""
-                        insert into outbox_events (id, event_type, aggregate_id, payload, request_id, created_at)
-                        values (:id, :type, :aggregateId, cast(:payload as jsonb), :requestId, :createdAt)
+                        insert into outbox_events
+                            (id, event_type, aggregate_id, payload, request_id, created_at, available_at)
+                        values (:id, :type, :aggregateId, cast(:payload as jsonb), :requestId, :createdAt, :createdAt)
                         """)
                 .param("id", event.eventId())
                 .param("type", event.type())
