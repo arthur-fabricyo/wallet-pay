@@ -1,7 +1,8 @@
 # Fase 2 — Segurança e confiabilidade ✅
 
 Specs 10 a 15; plano em [`docs/superpowers/plans/2026-10-15-fases-1-2.md`](../../docs/superpowers/plans/2026-10-15-fases-1-2.md).
-Implementada em 2026-10-20, com correções pós-revisão em 2026-10-28. Branch `feat/fases-1-2`.
+Implementada em 2026-10-20, com correções pós-revisão em 2026-10-28. Branch `feat/fases-1-2`, mergeada em `dev` em
+2026-11-03 (PRs #1 e #2).
 
 ## Resultado por spec
 
@@ -20,7 +21,7 @@ Implementada em 2026-10-20, com correções pós-revisão em 2026-10-28. Branch 
 5. Lock otimista (spec 10) → 6. Depósito (spec 11) → 7. Idempotência (spec 12) → 8. Auditoria A (spec 13) →
 9. Envers B (spec 13) → 10. Limites aplicados (spec 14) → 11. Endpoints de limites → 12. Testes ponta a ponta (spec 15).
 
-Linha de base antes da Task 1: 83 testes passando. Hoje: 217 métodos `@Test` (contagem estática).
+Linha de base antes da Task 1: 83 testes passando. Ao fim da Fase 2: 217 métodos `@Test` (contagem estática); após a Fase 3, 296 testes executados (ver [testes](../03-arquitetura/testes.md)).
 
 ## Correções posteriores à implementação
 
@@ -42,6 +43,6 @@ O plano registra 11 decisões em que detalhou ou ajustou as specs — todas desc
 
 ## Pendências de fechamento
 
-- Merge de `feat/fases-1-2` em `main` (e da `docs/specs-fase-1-2`, de onde a branch nasceu).
+- ✅ Merge de `feat/fases-1-2` e `docs/specs-fase-1-2` em `dev`. Falta `dev` → `main` (decisão D1, esteira E02).
 - Marcar os checkboxes do plano ou arquivá-lo como concluído.
 - Itens abertos de [pendências](../04-pendencias/pendencias-e-divida-tecnica.md).

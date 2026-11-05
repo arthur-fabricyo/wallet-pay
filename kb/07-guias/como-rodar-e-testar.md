@@ -68,10 +68,15 @@ export JAVA_HOME="/c/Program Files/JetBrains/IntelliJ IDEA 2026.2.3/jbr"
 4. `POST /wallets/me/deposits` (header `Authorization` + `Idempotency-Key`) para ter saldo.
 5. `POST /transactions/transfers` para outro usuário; `GET /transactions/{id}/receipt`; `GET /wallets/me/statement`.
 6. Conferir a auditoria por SQL: `SELECT action, outcome, failure_code, request_id FROM audit_events ORDER BY occurred_at;`
+7. Notificações: o push aparece no log (`LoggingPushGateway`); com `PUT /notifications/preferences/EMAIL` `{"enabled": true}`,
+   o e-mail chega no Mailpit (`http://localhost:8025`). Filas e DLQs ficam visíveis no console do RabbitMQ.
 
 ## Fluxo de trabalho do projeto
 
-1. Escrever/atualizar a **spec** em `docs/specs`.
-2. Para trabalho de várias etapas, escrever um **plano** em `docs/superpowers/plans`.
-3. Implementar task a task, um commit por task (conventional commits, em inglês).
-4. Atualizar esta KB ao concluir ([roadmap](../01-produto/roadmap.md), [estado atual](../02-andamento/estado-atual.md)).
+1. Pegar o próximo item da [esteira](../05-proximos-passos/esteira.md).
+2. Item grande: **design doc** em `docs/superpowers/specs/AAAA-MM-DD-<tema>-design.md` (modelo: o da Fase 3) e **plano** em
+   `docs/superpowers/plans`. As specs numeradas de `docs/specs` (01–15) são das Fases 1 e 2.
+3. Branch a partir de `dev`; implementar task a task, um commit por task (conventional commits, em inglês); PR para `dev`.
+   O CI roda `./mvnw -B verify` no PR.
+4. Atualizar esta KB ao concluir (esteira, [roadmap](../01-produto/roadmap.md), [estado atual](../02-andamento/estado-atual.md),
+   [linha do tempo](../02-andamento/linha-do-tempo.md)).

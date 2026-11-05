@@ -1,7 +1,8 @@
 # Registro de decisões técnicas
 
-Decisões já tomadas e o porquê. Origem: specs 10–15 e a seção "Decisões de Implementação" do
-[plano](../../docs/superpowers/plans/2026-10-15-fases-1-2.md). Formato: decisão · motivo · consequência.
+Decisões já tomadas e o porquê. Origem: specs 10–15, a seção "Decisões de Implementação" do
+[plano](../../docs/superpowers/plans/2026-10-15-fases-1-2.md) e o design/plano da Fase 3
+(`docs/superpowers/specs/2026-11-04-notificacoes-design.md`). Formato: decisão · motivo · consequência.
 
 ## Concorrência e saldo
 
@@ -60,11 +61,23 @@ Decisões já tomadas e o porquê. Origem: specs 10–15 e a seção "Decisões 
 |---|---|---|---|
 | T27 | Monólito modular | `core.md` §6 | Separar serviços só com necessidade real |
 | T28 | Pasta `controllers` só com controllers; DTOs em `dto/` com sufixo `DTO` | Spec 09, padrão de mercado | — |
-| T29 | Testes sem Mockito (fakes por subclasse ou `Proxy`) | Padrão herdado dos testes existentes | — |
+| T29 | Testes sem Mockito (fakes por subclasse ou `Proxy`) | Padrão herdado dos testes existentes | ⚠️ Contrariada na Fase 3 (`@MockitoSpyBean`); revisar (pendência #37) |
 | T30 | Infra de testes e catálogo de erros antes das features | Features já nascem com `ErrorCode` e testes de integração | Ordem das tasks do plano |
-| T31 | Um commit por task, conventional commits em inglês, textos de domínio em português sem acento | Rastreabilidade | — |
+| T31 | Um commit por task, conventional commits em inglês, textos de domínio em português sem acento | Rastreabilidade | ⚠️ Textos das notificações da Fase 3 têm acento; revisar (pendência #37) |
 | T32 | Integrações reais (banco/Pix/investimentos) ficam simuladas no MVP | Escopo regulatório | Fase 8 só com sandbox |
+
+## Eventos e notificações (Fase 3)
+
+| ID | Decisão | Motivo | Consequência |
+|---|---|---|---|
+| T33 | **Transactional Outbox**: o use case só grava em `outbox_events` (`MANDATORY`); um job publica | Operação financeira não pode depender do broker nem perder evento em rollback | Entrega *at-least-once*; handlers precisam ser idempotentes |
+| T34 | RabbitMQ atrás das portas `EventPublisher`/`EventHandler`; AMQP só em `common/event/rabbit` | Trocar de broker (ex.: Kafka) = novo adaptador (D2) | `ArchitectureBoundaryTest` falha se AMQP vazar |
+| T35 | Um tópico `walletpay.events`, routing key = tipo do evento; uma fila + DLQ por (consumidor, tipo) | Cada consumidor recebe sua cópia e falha isolado | Novo `EventHandler` ganha fila sozinho; tipo de evento sem pontos |
+| T36 | Publicador espera a confirmação do broker antes de marcar `published_at` | Sem confirmação, evento podia ser marcado publicado e se perder (`8b0cc1f`) | Nack ou timeout mantêm a linha pendente |
+| T37 | Idempotência de entrega por (evento, usuário, canal), não tabela genérica de eventos processados | Falha de um canal não pode impedir os outros nem duplicar o que já foi entregue (`4b4ce9e`) | Duas notificações do mesmo evento para o mesmo usuário colidem: cada uma precisa de evento próprio |
+| T38 | Broker e e-mail fora do `/actuator/health`; conexão ao broker com timeout de 5 s | Indisponibilidade do broker não pode derrubar a aplicação (`8a0bf89`) | Saúde do broker precisa de métrica/alerta próprio (esteira A08) |
+| T39 | Testes com containers compartilhados na JVM e namespace aleatório do broker por contexto (D7) | Tempo da suíte e isolamento entre contextos Spring | Filas de teste com prefixo `<uuid>.` |
 
 ## Como registrar uma nova decisão
 
-Acrescente uma linha com ID sequencial (`T33`, …), motivo e consequência. Se a decisão alterar uma spec, atualize a spec também.
+Acrescente uma linha com ID sequencial (`T40`, …), motivo e consequência. Se a decisão alterar uma spec, atualize a spec também.

@@ -6,6 +6,11 @@
 > notificações push (porta `PushGateway`, stub em log) e e-mail opcional (`EmailSender` SMTP compartilhado), preferências por
 > usuário (`notification_preferences`), idempotência de entrega por (evento, usuário, canal). **Ainda pendente:** `MoneyReceived`/
 > `BalanceUpdated` e depósito, histórico de notificações, DLQ consultável, métricas, migrar `Logging*Sender`, push real.
+> Mergeado em `dev` em 2026-11-05 (PR #3). O que falta está nos blocos A e B da [esteira](esteira.md); decisões tomadas em
+> T33–T39 ([decisões](../06-decisoes/decisoes-tecnicas.md)).
+> Divergências do entregue em relação à proposta abaixo: um único tópico com routing key = tipo (não exchange por tipo);
+> idempotência por (evento, usuário, canal) em vez de tabela genérica de eventos processados; sem histórico de notificações;
+> a transferência emite só `TransferCompleted`.
 > O texto abaixo é a proposta original.
 
 > **Proposta original.** Baseada em [`docs/core.md` §7–8](../../docs/core.md) e no código atual. Ainda não existem specs para esta fase.
