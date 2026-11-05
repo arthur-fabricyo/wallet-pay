@@ -169,7 +169,7 @@ Request e response inalterados.
 
 Quando:
 
-- `Idempotency-Key` nao for enviado (`IDEMPOTENCY_KEY_REQUIRED`).
+- `Idempotency-Key` nao for enviado, vier vazio ou so com espacos (`IDEMPOTENCY_KEY_REQUIRED`).
 - `Idempotency-Key` tiver tamanho ou caracteres invalidos (`IDEMPOTENCY_KEY_INVALID`).
 
 ### 422 Unprocessable Entity
@@ -192,7 +192,7 @@ Response:
 
 ## Fluxo Principal
 
-1. Controller le e valida `Idempotency-Key`.
+1. Controller le `Idempotency-Key` com `@RequestHeader(required = false)` e valida com `IdempotencyKeys.require`, para que ausente, vazio e so espacos tenham a mesma resposta. Uma chave `""` nunca e gravada.
 2. Controller monta o comando com a chave e chama a camada externa (`TransferService` ou `DepositService`).
 3. A camada `@Transactional` calcula o hash do comando normalizado.
 4. Remove a chave expirada, se existir.
@@ -206,7 +206,7 @@ Response:
 ## Criterios de Aceite
 
 - Deve exigir `Idempotency-Key` em transferencias e depositos.
-- Deve rejeitar chave ausente com 400 `IDEMPOTENCY_KEY_REQUIRED`.
+- Deve rejeitar chave ausente, vazia ou so com espacos com 400 `IDEMPOTENCY_KEY_REQUIRED`.
 - Deve rejeitar chave invalida com 400 `IDEMPOTENCY_KEY_INVALID`.
 - Repetir a mesma chave e o mesmo payload deve retornar a mesma resposta e debitar uma unica vez.
 - A resposta repetida deve conter `Idempotent-Replayed: true`.

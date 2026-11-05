@@ -91,7 +91,7 @@ Enum `common/error/ErrorCode`, onde cada valor conhece seu status HTTP:
 | `DUPLICATE_USER_DATA` | 409 | E-mail ou documento ja cadastrado |
 | `RECEIPT_UNAVAILABLE` | 409 | Comprovante indisponivel |
 | `BALANCE_CONFLICT` | 409 | Retentativas de concorrencia esgotadas (spec 10) |
-| `DATA_CONFLICT` | 409 | Violacao de integridade nao tratada |
+| `DATA_CONFLICT` | 409 | Violacao de integridade nao tratada ou conflito de versao fora de operacao de saldo |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | `Content-Type` nao suportado |
 | `INSUFFICIENT_BALANCE` | 422 | Saldo insuficiente |
 | `LIMIT_EXCEEDED` | 422 | Limite excedido (spec 14) |
@@ -113,11 +113,12 @@ Novos handlers:
 
 - `HttpMessageNotReadableException` -> `MALFORMED_REQUEST`, mensagem `Corpo da requisicao invalido`.
 - `MethodArgumentTypeMismatchException` e `MissingServletRequestParameterException` -> `INVALID_PARAMETER`, com o nome do parametro em `fields`.
-- `MissingRequestHeaderException` -> `INVALID_PARAMETER`, exceto `Idempotency-Key`, que usa `IDEMPOTENCY_KEY_REQUIRED`.
+- `MissingRequestHeaderException` -> `INVALID_PARAMETER`. `Idempotency-Key` e lido com `required = false` e validado por `IdempotencyKeys.require` (spec 12), entao nao passa por aqui.
 - `HttpRequestMethodNotSupportedException` -> `METHOD_NOT_ALLOWED`.
 - `HttpMediaTypeNotSupportedException` -> `UNSUPPORTED_MEDIA_TYPE`.
 - `NoResourceFoundException` -> `ROUTE_NOT_FOUND`.
 - `DataIntegrityViolationException` -> `DATA_CONFLICT`, mensagem `Conflito de dados`.
+- `OptimisticLockingFailureException` que escapa de uma operacao fora de saldo (exemplo: dois `PUT /wallets/me/limits` simultaneos) -> `DATA_CONFLICT`, mensagem `Conflito de dados`, log em `WARN`. Operacoes de saldo convertem antes para `BALANCE_CONFLICT` (spec 10).
 - `Exception` -> `INTERNAL_ERROR`, mensagem `Erro interno, informe o requestId ao suporte`.
 
 ### Erros Inesperados

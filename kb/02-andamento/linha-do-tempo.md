@@ -50,6 +50,7 @@ Reconstruída a partir do histórico git (`git log`). Datas no formato AAAA-MM-D
 | 11-05 | Correções da revisão final: falha de um canal não impede os outros; outbox espera confirmação do broker; broker e e-mail fora do health | `4b4ce9e`, `8b0cc1f`, `8a0bf89` |
 | 11-05 | Pendências registradas na KB; CI no GitHub Actions; Fase 3 mergeada em `dev` (PR #3) | `ff1fb96`, `5a1bef3`, `5b2c760` |
 | 11-05 | KB revisada contra o código e criada a [esteira](../05-proximos-passos/esteira.md) de trabalho | — |
+| 11-05 | Esteira bloco 0: CI também em push para `dev` (E01); plano das Fases 1–2 concluído e specs alinhadas (E03) | `5118947` |
 
 ## Hoje (2026-11-05)
 

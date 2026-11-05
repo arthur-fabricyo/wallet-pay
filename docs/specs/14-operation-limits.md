@@ -45,6 +45,7 @@ walletpay.limits.deposit.daily=20000.00
 
 Validacoes na inicializacao:
 
+- `timezone`, `night.start` e `night.end` sao `String` validadas no construtor do record e convertidas para `ZoneId`/`LocalTime` nos acessores, sem depender de conversores do binder.
 - Todos os valores devem ser positivos.
 - `per-operation <= daily <= monthly`.
 - `night-per-operation <= night-window`.
