@@ -12,6 +12,7 @@ import ElFabrica.Wallet_pay.common.money.InvalidAmountException;
 import ElFabrica.Wallet_pay.support.PassThroughIdempotencyService;
 import ElFabrica.Wallet_pay.support.PermissiveOperationLimitService;
 import ElFabrica.Wallet_pay.support.RecordingAuditLogger;
+import ElFabrica.Wallet_pay.support.RecordingOutboxRecorder;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionStatus;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionType;
@@ -57,7 +58,7 @@ class CreateTransferUseCaseTest {
             IdempotencyService idempotencyService,
             AuditLogger auditLogger
     ) {
-        return new CreateTransferUseCase(walletRepository, transactionRepository, CLOCK, idempotencyService, auditLogger, new PermissiveOperationLimitService());
+        return new CreateTransferUseCase(walletRepository, transactionRepository, CLOCK, idempotencyService, auditLogger, new PermissiveOperationLimitService(), new RecordingOutboxRecorder(), tools.jackson.databind.json.JsonMapper.builder().build());
     }
 
     @Test

@@ -5,7 +5,9 @@
 
 ## Sequência recomendada
 
-### Passo 0 — Fechar a Fase 2 (curto)
+### Passo 0 — Fechar a Fase 2 (curto) — ✅ feito
+
+> A Fase 2 já está em `dev` (PRs #1 e #2) e a suíte está verde. Resta só o `dev` → `main`. O texto abaixo é o histórico.
 
 1. Rodar `./mvnw test` com Docker ligado e confirmar a suíte verde.
 2. Abrir PR de `feat/fases-1-2` → `main` (inclui as specs 10–15 e o plano) e mergear.
@@ -13,7 +15,10 @@
 4. Decidir quais pendências 🔴 de [pendências](../04-pendencias/pendencias-e-divida-tecnica.md) entram antes da Fase 3
    (sugestão: CI com a suíte e falhar na subida sem `JWT_SECRET` fora de dev).
 
-### Passo 1 — Fase 3: eventos e notificações
+### Passo 1 — Fase 3: eventos e notificações — 🟡 MVP entregue
+
+> Entregue: outbox + RabbitMQ atrás de portas + notificação de transferência (push stub e e-mail opcional). Pendente: depósito e
+> demais eventos, histórico de notificações, DLQ consultável, métricas, push real (Fase 7) e migrar os `Logging*Sender`.
 
 Por que agora: o motor de automações (Fase 4, o diferencial) **só faz sentido sobre eventos confiáveis**, e as notificações
 são a primeira entrega visível para o usuário. Escopo e riscos em [fase-3-eventos-e-notificacoes.md](fase-3-eventos-e-notificacoes.md).
@@ -44,12 +49,12 @@ App Android quando a API das fases 3–6 estabilizar; integração bancária e r
 | # | Decisão | Opções / contexto | Quando decidir |
 |---|---|---|---|
 | D1 | Mergear Fase 2 já ou agrupar com a Fase 3? | PR único agora (recomendado: histórico limpo) × continuar na mesma branch | Agora |
-| D2 | Broker da Fase 3 | RabbitMQ (previsto em `core.md`) × eventos internos do Spring primeiro, broker depois | Início da Fase 3 |
-| D3 | Provedor de e-mail | SMTP/MailHog em dev + provedor transacional em prod × manter em log até a Fase 3 estar pronta | Fase 3 |
+| D2 | Broker da Fase 3 | ✅ **Decidido:** RabbitMQ atrás das portas `EventPublisher`/`EventHandler` (troca por Kafka = novo adaptador) | — |
+| D3 | Provedor de e-mail | 🟡 **Parcial:** `EmailSender` SMTP compartilhado, testado com Mailpit. Provedor transacional de produção segue em aberto | Antes de produção |
 | D4 | Onde fica o rate limiting | Filtro em memória (Bucket4j) × Redis (já previsto para coordenação) × no gateway | Antes de expor a API |
 | D5 | Modelo de categorias de transação | Necessário para orçamentos (Fase 5) e condições do motor (Fase 4) | Início da Fase 4 |
 | D6 | Escopo mínimo do motor de automações (MVP) | Quais gatilhos/ações entram na primeira versão | Antes da Fase 4 |
-| D7 | Estratégia de testes com broker | Testcontainers RabbitMQ × fakes em memória | Fase 3 |
+| D7 | Estratégia de testes com broker | ✅ **Decidido:** Testcontainers (RabbitMQ, Mailpit, PostgreSQL), containers compartilhados na JVM de teste | — |
 
 ## Marcos sugeridos
 

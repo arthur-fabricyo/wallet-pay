@@ -3,6 +3,7 @@ package ElFabrica.Wallet_pay.transaction.service;
 import ElFabrica.Wallet_pay.audit.AuditAction;
 import ElFabrica.Wallet_pay.audit.AuditEntry;
 import ElFabrica.Wallet_pay.audit.AuditLogger;
+import ElFabrica.Wallet_pay.common.event.OutboxRecorder;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotencyRequest;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotencyService;
 import ElFabrica.Wallet_pay.common.idempotency.IdempotentOperation;
@@ -11,6 +12,7 @@ import ElFabrica.Wallet_pay.common.idempotency.RequestHash;
 import ElFabrica.Wallet_pay.common.money.Money;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionDescription;
 import ElFabrica.Wallet_pay.transaction.domain.TransactionEntity;
+import ElFabrica.Wallet_pay.transaction.event.TransferCompletedEvent;
 import ElFabrica.Wallet_pay.transaction.repository.TransactionRepository;
 import ElFabrica.Wallet_pay.wallet.domain.WalletEntity;
 import ElFabrica.Wallet_pay.wallet.repository.WalletRepository;
@@ -21,6 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class CreateTransferUseCase {
@@ -31,6 +34,8 @@ public class CreateTransferUseCase {
     private final IdempotencyService idempotencyService;
     private final AuditLogger auditLogger;
     private final OperationLimitService operationLimitService;
+    private final OutboxRecorder outboxRecorder;
+    private final JsonMapper jsonMapper;
 
     public CreateTransferUseCase(
             WalletRepository walletRepository,
@@ -38,7 +43,9 @@ public class CreateTransferUseCase {
             Clock clock,
             IdempotencyService idempotencyService,
             AuditLogger auditLogger,
-            OperationLimitService operationLimitService
+            OperationLimitService operationLimitService,
+            OutboxRecorder outboxRecorder,
+            JsonMapper jsonMapper
     ) {
         this.walletRepository = walletRepository;
         this.transactionRepository = transactionRepository;
@@ -46,6 +53,8 @@ public class CreateTransferUseCase {
         this.idempotencyService = idempotencyService;
         this.auditLogger = auditLogger;
         this.operationLimitService = operationLimitService;
+        this.outboxRecorder = outboxRecorder;
+        this.jsonMapper = jsonMapper;
     }
 
     @Transactional
@@ -109,6 +118,9 @@ public class CreateTransferUseCase {
                         "receiverWalletId", receiverWallet.getId()
                 )
         ).withActor(command.senderUserId()));
+
+        outboxRecorder.record(TransferCompletedEvent.of(
+                transaction, command.senderUserId(), command.receiverUserId(), jsonMapper, now));
 
         return new TransferResult(
                 transaction.getId(),
