@@ -43,8 +43,10 @@ Alteracoes:
 Nova factory em `TransactionEntity`:
 
 ```java
-public static TransactionEntity completedDeposit(WalletEntity receiverWallet, BigDecimal amount, String description)
+public static TransactionEntity completedDeposit(WalletEntity receiverWallet, BigDecimal amount, String description, Instant occurredAt)
 ```
+
+`occurredAt` vem do bean `Clock` da aplicacao, assim como em `completedTransfer`. `created_at` e as janelas de limite da spec 14 usam o mesmo relogio.
 
 ## Enums
 
@@ -86,6 +88,7 @@ Regras de `Money.parse`:
 - Valor numerico.
 - Maior que zero.
 - No maximo duas casas decimais.
+- No maximo 17 digitos na parte inteira, para nunca estourar `NUMERIC(19, 2)`.
 
 Falhas lancam `InvalidAmountException` (em `common/money`), mapeada para 400 com code `INVALID_AMOUNT`.
 
@@ -178,7 +181,7 @@ Novas regras:
 
 Quando:
 
-- Valor ausente, nao numerico, menor ou igual a zero ou com mais de duas casas decimais (`INVALID_AMOUNT`).
+- Valor ausente, nao numerico, menor ou igual a zero, com mais de duas casas decimais ou com mais de 17 digitos inteiros (`INVALID_AMOUNT`).
 - Descricao com mais de 255 caracteres.
 - Payload invalido.
 

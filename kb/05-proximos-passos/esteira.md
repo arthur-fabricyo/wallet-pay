@@ -27,9 +27,9 @@ Referências `#n` apontam para [pendências e dívida técnica](../04-pendencias
 | ID | Item | Por quê | Depende de | Tam. | Status |
 |---|---|---|---|---|---|
 | E00 | Atualizar a KB após a Fase 3 e criar esta esteira | KB parou na Fase 2 em vários pontos; achados da revisão não estavam registrados | — | R | ✅ |
-| E01 | Rodar CI também em push para `dev` | Hoje `ci.yml` só roda em push para `main` e em PRs (#22) | — | R | ⬜ |
+| E01 | Rodar CI também em push para `dev` | Hoje `ci.yml` só roda em push para `main` e em PRs (#22) | — | R | ✅ |
 | E02 | ❓ Promover `dev` → `main` (D1) | `main` ainda não tem nenhuma fase | E01 | R | ❓ |
-| E03 | Marcar o plano `2026-10-15-fases-1-2.md` como concluído e refletir os ajustes do plano nas specs | Checkboxes todos `- [ ]`; specs divergem das decisões T17 etc. (#2, #4) | — | R | ⬜ |
+| E03 | Marcar o plano `2026-10-15-fases-1-2.md` como concluído e refletir os ajustes do plano nas specs | Checkboxes todos `- [ ]`; specs divergem das decisões T17 etc. (#2, #4) | — | R | ✅ |
 
 ## Bloco A — Base de eventos (pré-requisito do motor)
 

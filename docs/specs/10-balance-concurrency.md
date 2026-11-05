@@ -194,6 +194,7 @@ Requisito: Docker disponivel para executar `./mvnw test`.
 - `balanceRetryTemplate` deve ser o unico mecanismo de retentativa de operacoes de saldo.
 - Teste unitario deve verificar o numero de tentativas com o use case mockado.
 - Teste de integracao: carteira com `100.00`, 20 threads transferindo `10.00` cada para outra carteira.
+- Cada thread simula o cliente: repete a chamada ao receber 409 `BALANCE_CONFLICT`. Sem isso, o numero de sucessos depende do escalonamento das threads e o teste nao e deterministico.
 - Resultado esperado: exatamente 10 sucessos, saldo final da origem `0.00`, destino `+100.00`, nenhum saldo negativo.
 - A soma de todos os saldos deve ser igual antes e depois do teste de concorrencia.
 - Os testes existentes devem continuar passando.

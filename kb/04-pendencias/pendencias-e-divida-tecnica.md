@@ -9,9 +9,9 @@ A **ordem de execução** destes itens está na [esteira](../05-proximos-passos/
 | # | Item | Prio | Detalhe |
 |---|---|---|---|
 | 1 | Mergear `feat/fases-1-2` | 🟡 | ✅ Em `dev` desde 2026-11-03 (PRs #1 e #2). Falta `dev` → `main` (decisão D1) |
-| 2 | Atualizar o plano `2026-10-15-fases-1-2.md` | 🟢 | 105 checkboxes ainda `- [ ]` apesar de tudo implementado; marcar ou mover para "concluídos" |
+| 2 | Atualizar o plano `2026-10-15-fases-1-2.md` | ✅ | Plano marcado como concluído, com os 105 checkboxes marcados (esteira E03) |
 | 3 | Executar a suíte completa e registrar o resultado | ✅ | 296 testes verdes em 2026-11-04 (`./mvnw test`) |
-| 4 | Revisar specs vs. implementação | 🟢 | O plano ajustou a spec 15 (códigos de token). Refletir os 11 ajustes de [decisões](../06-decisoes/decisoes-tecnicas.md) nas specs |
+| 4 | Revisar specs vs. implementação | ✅ | Decisões de implementação do plano refletidas nas specs 10, 11, 12, 14 e 15 (esteira E03); a spec 15 já tinha os códigos de token e a spec 13 a configuração do Envers |
 
 ## Segurança
 
@@ -50,7 +50,7 @@ A **ordem de execução** destes itens está na [esteira](../05-proximos-passos/
 
 | # | Item | Prio | Detalhe |
 |---|---|---|---|
-| 22 | CI/CD com a suíte rodando | 🟡 | ✅ CI existe (`.github/workflows/ci.yml`, `./mvnw -B verify` em push para `main` e em PRs). Falta rodar em push para `dev` e CD |
+| 22 | CI/CD com a suíte rodando | 🟡 | ✅ CI existe (`.github/workflows/ci.yml`, `./mvnw -B verify` em push para `main` e `dev` e em PRs; esteira E01). Falta CD |
 | 23 | Métricas (Micrometer), dashboards, alertas | 🟡 | Só existem `X-Request-Id` e log com correlação; nenhum `MeterRegistry` no código |
 | 24 | Dockerfile / Compose da aplicação | 🟡 | `docker-compose.yml` sobe Postgres, RabbitMQ e Mailpit; falta a aplicação (Dockerfile) |
 | 25 | Cobertura de testes (JaCoCo) | 🟢 | Sem relatório |

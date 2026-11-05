@@ -11,10 +11,10 @@ Atualizado em **2026-11-05**.
 | Fase 3 (notificações de transferência — MVP) | ✅ Implementada e em `dev` (PR #3, 2026-11-05); itens restantes nos blocos A e B da [esteira](../05-proximos-passos/esteira.md) |
 | Branch principal de trabalho | `dev` (features em `feat/…` a partir dela) |
 | Integração em `main` | ⚠️ Fases 1 a 3 estão em `dev`; `dev` → `main` ainda não foi feito (D1) |
-| CI | GitHub Actions (`.github/workflows/ci.yml`): `./mvnw -B verify` em push para `main` e em PRs; não roda em push para `dev` |
+| CI | GitHub Actions (`.github/workflows/ci.yml`): `./mvnw -B verify` em push para `main` e `dev` e em PRs |
 | Testes | **296** testes, suíte verde (`./mvnw test`, Docker ligado) |
 | Migrations Flyway | V1 a V13 (V11 outbox, V12 preferências, V13 entregas); próxima: V14 |
-| Plano `2026-10-15-fases-1-2.md` | 12 tasks, todas implementadas segundo o histórico git, mas os checkboxes do arquivo continuam todos `- [ ]` |
+| Plano `2026-10-15-fases-1-2.md` | Concluído: 12 tasks implementadas e marcadas; ajustes do plano refletidos nas specs 10–15 |
 | O que fazer agora | Ver a [esteira](../05-proximos-passos/esteira.md): base de eventos e fechamento da Fase 3, depois o motor de automações (Fase 4) |
 
 ## O que a API entrega hoje

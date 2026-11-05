@@ -71,8 +71,8 @@ Pré-requisitos e fatias propostas: blocos A e F4 da [esteira](../05-proximos-pa
 
 - [x] Docker Compose da infraestrutura (Postgres, RabbitMQ, Mailpit); `X-Request-Id` e correlação nos logs.
 - [ ] Aplicação no Compose e Dockerfile.
-- [x] CI: `./mvnw -B verify` no GitHub Actions (push para `main` e PRs).
-- [ ] CI em push para `dev`, cobertura (JaCoCo), análise estática e CD.
+- [x] CI: `./mvnw -B verify` no GitHub Actions (push para `main` e `dev`, e PRs).
+- [ ] Cobertura (JaCoCo), análise estática e CD.
 - [ ] Micrometer + Prometheus + Grafana; alertas e rastreamento de erros.
 
 ## Fase 10 — Avançadas ⬜

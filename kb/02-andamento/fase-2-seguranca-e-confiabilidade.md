@@ -44,5 +44,5 @@ O plano registra 11 decisões em que detalhou ou ajustou as specs — todas desc
 ## Pendências de fechamento
 
 - ✅ Merge de `feat/fases-1-2` e `docs/specs-fase-1-2` em `dev`. Falta `dev` → `main` (decisão D1, esteira E02).
-- Marcar os checkboxes do plano ou arquivá-lo como concluído.
+- ✅ Plano marcado como concluído e ajustes refletidos nas specs 10–15 (esteira E03).
 - Itens abertos de [pendências](../04-pendencias/pendencias-e-divida-tecnica.md).
