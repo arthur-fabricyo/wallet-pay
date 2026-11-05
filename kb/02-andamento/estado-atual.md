@@ -1,6 +1,6 @@
 # Estado atual do projeto
 
-Atualizado em **2026-11-04**.
+Atualizado em **2026-11-05**.
 
 ## Situação em uma tabela
 
@@ -8,13 +8,14 @@ Atualizado em **2026-11-04**.
 |---|---|
 | Fase 1 (núcleo da carteira) | ✅ Implementada |
 | Fase 2 (segurança e confiabilidade) | ✅ Implementada e em `dev` (PRs #1 e #2) |
-| Fase 3 (notificações de transferência — MVP) | ✅ Implementada na branch `feat/fase-3-notificacoes` (PR para `dev` pendente de revisão) |
-| Branch de trabalho | `feat/fase-3-notificacoes` (a partir de `dev`) |
-| Integração em `main` | ⚠️ Fases 1 e 2 estão em `dev`; `dev` → `main` ainda não foi feito |
+| Fase 3 (notificações de transferência — MVP) | ✅ Implementada e em `dev` (PR #3, 2026-11-05); itens restantes nos blocos A e B da [esteira](../05-proximos-passos/esteira.md) |
+| Branch principal de trabalho | `dev` (features em `feat/…` a partir dela) |
+| Integração em `main` | ⚠️ Fases 1 a 3 estão em `dev`; `dev` → `main` ainda não foi feito (D1) |
+| CI | GitHub Actions (`.github/workflows/ci.yml`): `./mvnw -B verify` em push para `main` e em PRs; não roda em push para `dev` |
 | Testes | **296** testes, suíte verde (`./mvnw test`, Docker ligado) |
-| Migrations Flyway | V1 a V13 (V11 outbox, V12 preferências, V13 entregas) |
+| Migrations Flyway | V1 a V13 (V11 outbox, V12 preferências, V13 entregas); próxima: V14 |
 | Plano `2026-10-15-fases-1-2.md` | 12 tasks, todas implementadas segundo o histórico git, mas os checkboxes do arquivo continuam todos `- [ ]` |
-| Próxima fase | Fase 4 — motor de automações |
+| O que fazer agora | Ver a [esteira](../05-proximos-passos/esteira.md): base de eventos e fechamento da Fase 3, depois o motor de automações (Fase 4) |
 
 ## O que a API entrega hoje
 
@@ -36,10 +37,12 @@ Lista completa de rotas: [api.md](../03-arquitetura/api.md).
 - E-mails de verificação e recuperação **ainda são simulados**: o token é escrito no log (`LoggingEmailVerificationSender`,
   `LoggingPasswordRecoverySender`). O `EmailSender` compartilhado já existe; falta migrá-los.
 - Push é um stub (`LoggingPushGateway`): a entrega real vem com o app Android (Fase 7).
-- Só a transferência gera evento; depósito e demais tipos ainda não.
-- Sem histórico de notificações nem DLQ consultável por API; sem métricas.
+- Só a transferência gera evento; depósito e demais tipos ainda não. O evento não indica se a operação veio do usuário ou
+  de uma automação.
+- Sem histórico de notificações nem DLQ consultável por API; uma linha inválida no outbox trava a publicação.
 - Sem rate limiting (previsto em `core.md` §5, não coberto por nenhuma spec).
-- Sem CI/CD, métricas ou dashboards.
+- Sem CD, métricas ou dashboards (CI existe).
+- Agendador do Spring com uma única thread; auditoria não consegue gravar ator `SYSTEM`.
 - Uma carteira por usuário, apenas BRL; sem estorno; todas as transações criadas são `COMPLETED` (o banco aceita `FAILED`, mas nada o grava; `PENDING` não passa no check do banco).
 - Detalhes e prioridades: [pendências e dívida técnica](../04-pendencias/pendencias-e-divida-tecnica.md).
 

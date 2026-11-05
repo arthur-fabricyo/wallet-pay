@@ -16,6 +16,11 @@ PostgreSQL 16, esquema controlado por Flyway (`src/main/resources/db/migration`)
 | V8 | `create_idempotency_keys` | `idempotency_keys` (`response_body JSONB`, único por usuário+operação+chave) |
 | V9 | `create_audit` | `audit_events` (append-only por trigger), `revinfo`, `users_aud`, `wallets_aud`, `transactions_aud` |
 | V10 | `create_wallet_limits` | `wallet_limits`, `wallet_limits_aud`, índices em `transactions` por carteira+`created_at` |
+| V11 | `create_outbox_events` | `outbox_events` + índice parcial dos não publicados (Fase 3) |
+| V12 | `create_notification_preferences` | `notification_preferences` (Fase 3) |
+| V13 | `create_notification_deliveries` | `notification_deliveries` (Fase 3) |
+
+Próxima versão livre: **V14**. Convenção: `V<n>__<verbo_objeto>.sql`; constraints nomeadas `fk_`, `uk_`, `ck_`, `idx_`.
 
 ## Tabelas de negócio
 
@@ -27,7 +32,11 @@ users ──1:1── wallets ──1:0..1── wallet_limits
   ├── refresh_tokens
   ├── email_verification_tokens
   ├── password_reset_tokens
-  └── idempotency_keys
+  ├── idempotency_keys
+  ├── notification_preferences
+  └── notification_deliveries
+
+outbox_events (sem FK; aggregate_id = id do agregado, ex.: transação)
 ```
 
 - **users:** `id`, `name`, `email`, `password_hash`, `document` (única), `email_verified`, `created_at`, `updated_at`.
@@ -44,7 +53,13 @@ users ──1:1── wallets ──1:0..1── wallet_limits
   `response_status`, `response_body`, `created_at`, `expires_at`. Limpeza diária de expiradas.
 - **audit_events:** `occurred_at`, `actor_type` (`USER`/`SYSTEM`/`ANONYMOUS`), `actor_user_id`, `action`, `resource_type`,
   `resource_id`, `outcome` (`SUCCESS`/`FAILURE`), `failure_code`, `metadata JSONB`, `ip`, `request_id`.
-  Trigger impede UPDATE/DELETE.
+  Trigger impede UPDATE/DELETE. Na prática o código só grava `USER` ou `ANONYMOUS` (pendência #30).
+- **outbox_events:** `id` (= `eventId`), `event_type`, `aggregate_id`, `payload JSONB`, `request_id`, `created_at`,
+  `published_at` (nulo = pendente), `attempts`, `last_error`. Sem limpeza (pendência #11d).
+- **notification_preferences:** (`user_id`, `channel`) único, `enabled`, timestamps; `ON DELETE CASCADE` em `users`.
+  Sem linha = padrão do canal (push ligado, e-mail desligado).
+- **notification_deliveries:** (`event_id`, `user_id`, `channel`) único, `delivered_at`. Garante entrega única por canal
+  na reentrega; não é histórico de notificações.
 - **revinfo + `*_aud`:** histórico do Envers (`rev`, `revtype`); `revinfo` guarda `user_id` e `request_id`.
   `users_aud` não contém `password_hash`.
 
@@ -53,8 +68,11 @@ users ──1:1── wallets ──1:0..1── wallet_limits
 - `AuditAction`: `USER_REGISTERED`, `LOGIN_SUCCEEDED`, `LOGIN_FAILED`, `LOGOUT`, `EMAIL_VERIFIED`, `PASSWORD_RESET_REQUESTED`,
   `PASSWORD_RESET_COMPLETED`, `TRANSFER_CREATED`, `TRANSFER_REJECTED`, `DEPOSIT_CREATED`, `DEPOSIT_REJECTED`, `LIMITS_UPDATED`.
 - `AuditResourceType`: `USER`, `WALLET`, `TRANSACTION`, `SESSION`.
-- `TransactionType`: `TRANSFER`, `DEPOSIT`. `TransactionStatus`: `PENDING`, `COMPLETED`, `FAILED`
-(atenção: o check `ck_transactions_status` do banco não inclui `PENDING` — relevante para a Fase 6, Pix assíncrono).
+- `TransactionType`: `TRANSFER`, `DEPOSIT`, `WITHDRAW`, `REFUND`, `FEE` — o check `ck_transactions_type` só aceita
+  `TRANSFER` e `DEPOSIT` (pendência #34). `TransactionStatus`: `PENDING`, `COMPLETED`, `FAILED`
+  (atenção: o check `ck_transactions_status` do banco não inclui `PENDING` — relevante para a Fase 6, Pix assíncrono).
+- `IdempotentOperation`: `TRANSFER_CREATE`, `DEPOSIT_CREATE` (coluna sem check; valor novo não exige migration).
+- `NotificationChannelType`: `PUSH` (sempre ligado, não alterável), `EMAIL` (opcional).
 
 ## Nota operacional
 

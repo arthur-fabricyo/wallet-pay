@@ -4,7 +4,8 @@ API backend de uma carteira digital, desenvolvida como projeto de portfólio com
 A visão completa do produto (incluindo o motor de automações financeiras) está em [`docs/core.md`](docs/core.md);
 as especificações de cada funcionalidade estão em [`docs/specs`](docs/specs).
 
-**Status:** Fases 1 (núcleo da carteira) e 2 (segurança e confiabilidade) do roadmap implementadas.
+**Status:** Fases 1 (núcleo da carteira), 2 (segurança e confiabilidade) e o MVP da Fase 3 (eventos e notificações de
+transferência) implementados. Estado detalhado, pendências e próximos passos na [base de conhecimento](kb/README.md).
 
 ## O que a aplicação já entrega
 
@@ -52,6 +53,8 @@ as especificações de cada funcionalidade estão em [`docs/specs`](docs/specs).
 | `PUT` | `/wallets/me/limits` | Reduzir limites personalizados |
 | `POST` | `/transactions/transfers` | Transferência (exige `Idempotency-Key`) |
 | `GET` | `/transactions/{transactionId}/receipt` | Comprovante |
+| `GET` | `/notifications/preferences` | Preferências de notificação por canal |
+| `PUT` | `/notifications/preferences/{channel}` | Habilitar/desabilitar o e-mail |
 
 Com a aplicação rodando, a documentação interativa fica em `http://localhost:8080/swagger-ui.html`
 (OpenAPI em `/v3/api-docs`).
@@ -60,15 +63,17 @@ Com a aplicação rodando, a documentação interativa fica em `http://localhost
 
 - Java 21, Spring Boot 4 (Web MVC, Security com OAuth2 Resource Server/JWT, Data JPA, Validation, Actuator)
 - PostgreSQL 16, Flyway, Hibernate Envers
+- RabbitMQ (Spring AMQP) com outbox transacional; Spring Mail (Mailpit em desenvolvimento)
 - springdoc-openapi
-- Testes: JUnit 5, AssertJ, Testcontainers
+- Testes: JUnit 5, AssertJ, Testcontainers (PostgreSQL, RabbitMQ, Mailpit)
+- CI: GitHub Actions (`./mvnw -B verify`)
 
 ## Como rodar
 
 Pré-requisitos: JDK 21+ e Docker.
 
 ```bash
-# Banco de dados
+# PostgreSQL, RabbitMQ (console em http://localhost:15672) e Mailpit (http://localhost:8025)
 docker compose up -d
 
 # Aplicação
@@ -83,6 +88,8 @@ Variáveis de ambiente opcionais (os valores padrão servem para desenvolvimento
 | `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` | `wallet_pay` |
 | `JWT_SECRET` | segredo de desenvolvimento (troque fora do ambiente local) |
 | `CNPJ_WS_BASE_URL` | `https://publica.cnpj.ws` |
+| `SPRING_RABBITMQ_HOST` / `_PORT` / `_USERNAME` / `_PASSWORD` | `localhost` / `5672` / `guest` / `guest` |
+| `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` | `localhost` / `1025` |
 
 Os limites de operação são configurados em `application.properties` (`walletpay.limits.*`).
 
@@ -98,3 +105,4 @@ Os testes de integração sobem PostgreSQL, RabbitMQ e Mailpit via Testcontainer
 
 Pelo [roadmap](docs/core.md#8-roadmap-sugerido): conclusão da Fase 3 (depósito e outros eventos, histórico de notificações), motor de automações (Fase 4),
 organização financeira (Fase 5), pagamentos simulados via Pix (Fase 6) e aplicativo Android (Fase 7).
+A ordem de execução, item a item, está na [esteira de trabalho](kb/05-proximos-passos/esteira.md).

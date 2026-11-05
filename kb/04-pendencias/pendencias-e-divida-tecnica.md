@@ -1,13 +1,14 @@
 # Pendências e dívida técnica
 
-Itens abertos das Fases 1 e 2. Prioridade: 🔴 alta · 🟡 média · 🟢 baixa.
-Origem: "fora de escopo" das specs, `docs/core.md` §5 e o estado do repositório em 2026-11-03.
+Itens abertos das Fases 1, 2 e 3. Prioridade: 🔴 alta · 🟡 média · 🟢 baixa · ✅ resolvido.
+Origem: "fora de escopo" das specs, `docs/core.md` §5, revisões finais das fases e leitura do código em 2026-11-05.
+A **ordem de execução** destes itens está na [esteira](../05-proximos-passos/esteira.md).
 
 ## Fechamento da Fase 2
 
 | # | Item | Prio | Detalhe |
 |---|---|---|---|
-| 1 | Mergear `feat/fases-1-2` em `main` | 🔴 | Branch 22 commits à frente; nasceu de `docs/specs-fase-1-2`, que também precisa entrar. Decidir: PR único ou squash |
+| 1 | Mergear `feat/fases-1-2` | 🟡 | ✅ Em `dev` desde 2026-11-03 (PRs #1 e #2). Falta `dev` → `main` (decisão D1) |
 | 2 | Atualizar o plano `2026-10-15-fases-1-2.md` | 🟢 | 105 checkboxes ainda `- [ ]` apesar de tudo implementado; marcar ou mover para "concluídos" |
 | 3 | Executar a suíte completa e registrar o resultado | ✅ | 296 testes verdes em 2026-11-04 (`./mvnw test`) |
 | 4 | Revisar specs vs. implementação | 🟢 | O plano ajustou a spec 15 (códigos de token). Refletir os 11 ajustes de [decisões](../06-decisoes/decisoes-tecnicas.md) nas specs |
@@ -49,12 +50,30 @@ Origem: "fora de escopo" das specs, `docs/core.md` §5 e o estado do repositóri
 
 | # | Item | Prio | Detalhe |
 |---|---|---|---|
-| 22 | CI/CD com a suíte rodando | 🔴 | Não há pipeline; os testes dependem de Docker |
-| 23 | Métricas (Micrometer), dashboards, alertas | 🟡 | Só existem `X-Request-Id` e log com correlação |
-| 24 | Dockerfile / Compose da aplicação | 🟡 | `docker-compose.yml` sobe apenas o Postgres |
+| 22 | CI/CD com a suíte rodando | 🟡 | ✅ CI existe (`.github/workflows/ci.yml`, `./mvnw -B verify` em push para `main` e em PRs). Falta rodar em push para `dev` e CD |
+| 23 | Métricas (Micrometer), dashboards, alertas | 🟡 | Só existem `X-Request-Id` e log com correlação; nenhum `MeterRegistry` no código |
+| 24 | Dockerfile / Compose da aplicação | 🟡 | `docker-compose.yml` sobe Postgres, RabbitMQ e Mailpit; falta a aplicação (Dockerfile) |
 | 25 | Cobertura de testes (JaCoCo) | 🟢 | Sem relatório |
 | 26 | `JAVA_HOME` não definido na máquina de dev | 🟢 | Build usa o JBR do IntelliJ (ver [guia](../07-guias/como-rodar-e-testar.md)); documentar/definir JDK 21 |
 | 27 | Circuit breaker no cliente do CNPJ | 🟢 | Hoje só há timeouts (2 s / 3 s) e `503` |
+
+## Achados da leitura do código (2026-11-05)
+
+Itens que não estavam registrados. Os quatro primeiros afetam diretamente o motor de automações (Fase 4).
+
+| # | Item | Prio | Detalhe |
+|---|---|---|---|
+| 28 | Outbox segura transação e locks durante o I/O do broker | 🟡 | `OutboxPublisherJob` publica dentro da `TransactionTemplate` que fez `for update skip locked`; ordem é só "melhor esforço" por instância. Achado da revisão final da Fase 3 (antes só no ledger local `.superpowers`) |
+| 29 | Evento não diz quem originou a operação | 🔴 | `TransferCompletedPayload` e `transactions` não têm origem/iniciador. Transferência feita por automação será idêntica à manual e pode disparar outras regras em cascata |
+| 30 | `AuditActorType.SYSTEM` não é gravável | 🟡 | `AuditLogger.insert` só produz `USER` (com ator) ou `ANONYMOUS`. Em jobs e consumidores não há `SecurityContext` nem IP |
+| 31 | Agendador com uma thread só | 🟡 | `SchedulingConfig` é só `@EnableScheduling`, sem `spring.task.scheduling.*`: outbox (2 s), limpeza de idempotência e futuros jobs dividem a mesma thread. Sem ShedLock; o único padrão multi-instância é `for update skip locked` |
+| 32 | Achados menores da revisão final da Fase 3 | 🟢 | Usuário desconhecido num lado derruba a notificação do outro lado; `displayName` não remove U+0085/U+2028/U+2029; dois testes usam `Thread.sleep` para provar ausência. Antes só no ledger local `.superpowers` |
+| 33 | `Instant.now()` fora do `Clock` | 🟢 | `WalletEntity`, `UserEntity`, `TransactionEntity` (fallback), entidades de token e serviços de auth usam `Instant.now()`, contrariando T22 |
+| 34 | Enums aceitam valores que o banco rejeita | 🟢 | `TransactionType` tem `WITHDRAW`/`REFUND`/`FEE` (check só aceita `TRANSFER`/`DEPOSIT`); `TransactionStatus.PENDING` (ver #14) |
+| 35 | Validação só no DTO | 🟡 | `CreateTransferUseCase` não valida `receiverUserId` nulo (NPE no hash) nem descrição > 255 (vira `DATA_CONFLICT` sem auditoria). `WalletController.updateMyLimits` não tem `@Valid`. Chamadas internas (motor) não passam pelos DTOs |
+| 36 | `ErrorCode.error()` só conhece alguns status | 🟢 | Um código com 429 lançaria `IllegalStateException`; ajustar antes do rate limiting. `ErrorCodeTest` fixa o catálogo exato |
+| 37 | Decisões T29 e T31 contrariadas na Fase 3 | 🟢 | `TransferNotificationIntegrationTest` usa `@MockitoSpyBean` (T29: sem Mockito); notificações têm acento (T31: textos sem acento). Decidir e alinhar |
+| 38 | Dois prefixos de configuração | 🟢 | `wallet-pay.*` (JWT, CNPJ, TTLs) e `walletpay.*` (limites, eventos, e-mail) |
 
 ## Riscos a acompanhar
 
