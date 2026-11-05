@@ -2,7 +2,7 @@
 
 Última execução completa: **296 testes, todos verdes** (2026-11-05, após a Fase 3; testes parametrizados contam cada caso).
 Contagem estática: 48 classes com testes em `src/test`. Rode `./mvnw test` para o estado real
-(ver [guia](../07-guias/como-rodar-e-testar.md)). O CI roda `./mvnw -B verify` em PRs e em push para `main`.
+(ver [guia](../07-guias/como-rodar-e-testar.md)). O CI roda `./mvnw -B verify` em PRs e em push para `main` e `dev`.
 
 ## Camadas
 
@@ -40,7 +40,7 @@ Contagem estática: 48 classes com testes em `src/test`. Rode `./mvnw test` para
 
 ## Lacunas
 
-- Sem relatório de cobertura (JaCoCo); CI não roda em push para `dev`.
+- Sem relatório de cobertura (JaCoCo).
 - Sem testes de carga/desempenho.
 - Dois testes usam `Thread.sleep` para provar ausência de efeito (pendência #32).
 - Exceção à regra "sem Mockito": `TransferNotificationIntegrationTest` usa `@MockitoSpyBean` (pendência #37).

@@ -50,7 +50,7 @@ A **ordem de execução** destes itens está na [esteira](../05-proximos-passos/
 
 | # | Item | Prio | Detalhe |
 |---|---|---|---|
-| 22 | CI/CD com a suíte rodando | 🟡 | ✅ CI existe (`.github/workflows/ci.yml`, `./mvnw -B verify` em push para `main` e em PRs). Falta rodar em push para `dev` e CD |
+| 22 | CI/CD com a suíte rodando | 🟡 | ✅ CI existe (`.github/workflows/ci.yml`, `./mvnw -B verify` em push para `main` e `dev` e em PRs; esteira E01). Falta CD |
 | 23 | Métricas (Micrometer), dashboards, alertas | 🟡 | Só existem `X-Request-Id` e log com correlação; nenhum `MeterRegistry` no código |
 | 24 | Dockerfile / Compose da aplicação | 🟡 | `docker-compose.yml` sobe Postgres, RabbitMQ e Mailpit; falta a aplicação (Dockerfile) |
 | 25 | Cobertura de testes (JaCoCo) | 🟢 | Sem relatório |
