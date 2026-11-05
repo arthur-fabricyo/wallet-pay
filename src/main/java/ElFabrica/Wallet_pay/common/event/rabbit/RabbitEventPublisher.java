@@ -17,6 +17,7 @@ public class RabbitEventPublisher implements EventPublisher {
 
     static final String EVENT_ID_HEADER = "eventId";
     static final String REQUEST_ID_HEADER = "requestId";
+    private static final long CONFIRM_TIMEOUT_MILLIS = 5_000;
 
     private final RabbitTemplate rabbitTemplate;
     private final JsonMapper jsonMapper;
@@ -41,6 +42,12 @@ public class RabbitEventPublisher implements EventPublisher {
         }
         Message message = builder.build();
 
-        rabbitTemplate.send(topology.exchange(), event.type(), message);
+        // Wait for the broker's confirm so the outbox row is only marked published once the broker accepted the
+        // message; a nack, closed channel or timeout throws and the row stays pending (at-least-once).
+        rabbitTemplate.invoke(operations -> {
+            operations.send(topology.exchange(), event.type(), message);
+            operations.waitForConfirmsOrDie(CONFIRM_TIMEOUT_MILLIS);
+            return null;
+        });
     }
 }

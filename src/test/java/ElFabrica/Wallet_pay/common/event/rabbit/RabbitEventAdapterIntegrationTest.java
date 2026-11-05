@@ -1,6 +1,7 @@
 package ElFabrica.Wallet_pay.common.event.rabbit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import ElFabrica.Wallet_pay.common.event.DomainEvent;
@@ -167,6 +168,17 @@ class RabbitEventAdapterIntegrationTest extends AbstractIntegrationTest {
             Message dead = rabbitTemplate.receive(dlq());
             assertThat(dead).isNotNull();
         });
+    }
+
+    @Test
+    void publishFailsWhenTheBrokerDoesNotAcceptTheMessage() {
+        rabbitAdmin.deleteExchange(topology.exchange());
+        try {
+            assertThatThrownBy(() -> publisher.publish(event("AdapterSample", null)))
+                    .isInstanceOf(RuntimeException.class);
+        } finally {
+            rabbitAdmin.initialize();
+        }
     }
 
     @Test
