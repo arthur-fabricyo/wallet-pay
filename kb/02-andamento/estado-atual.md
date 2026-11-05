@@ -11,7 +11,7 @@ Atualizado em **2026-11-04**.
 | Fase 3 (notificações de transferência — MVP) | ✅ Implementada na branch `feat/fase-3-notificacoes` (PR para `dev` pendente de revisão) |
 | Branch de trabalho | `feat/fase-3-notificacoes` (a partir de `dev`) |
 | Integração em `main` | ⚠️ Fases 1 e 2 estão em `dev`; `dev` → `main` ainda não foi feito |
-| Testes | **293** testes, suíte verde (`./mvnw test`, Docker ligado) |
+| Testes | **296** testes, suíte verde (`./mvnw test`, Docker ligado) |
 | Migrations Flyway | V1 a V13 (V11 outbox, V12 preferências, V13 entregas) |
 | Plano `2026-10-15-fases-1-2.md` | 12 tasks, todas implementadas segundo o histórico git, mas os checkboxes do arquivo continuam todos `- [ ]` |
 | Próxima fase | Fase 4 — motor de automações |
