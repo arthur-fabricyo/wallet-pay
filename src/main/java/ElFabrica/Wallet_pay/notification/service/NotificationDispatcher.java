@@ -4,6 +4,7 @@ import ElFabrica.Wallet_pay.notification.Notification;
 import ElFabrica.Wallet_pay.notification.channel.NotificationChannel;
 import ElFabrica.Wallet_pay.notification.repository.NotificationDeliveryRepository;
 import java.time.Clock;
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -26,13 +27,19 @@ public class NotificationDispatcher {
             NotificationDeliveryRepository deliveries,
             Clock clock
     ) {
-        this.channels = channels;
+        // Push first: it is the always-on channel and must not wait behind a slower or failing one.
+        this.channels = channels.stream().sorted(Comparator.comparing(channel -> channel.type())).toList();
         this.preferences = preferences;
         this.deliveries = deliveries;
         this.clock = clock;
     }
 
+    /**
+     * Tries every enabled channel independently. If any fails, the others are still attempted and the first failure is
+     * rethrown at the end (with the rest suppressed), so the caller retries and only the pending channels run again.
+     */
     public void dispatch(Notification notification) {
+        RuntimeException failure = null;
         for (NotificationChannel channel : channels) {
             if (!preferences.isEnabled(notification.userId(), channel.type())) {
                 continue;
@@ -40,8 +47,20 @@ public class NotificationDispatcher {
             if (deliveries.exists(notification.eventId(), notification.userId(), channel.type())) {
                 continue;
             }
-            channel.deliver(notification);
-            deliveries.markDelivered(notification.eventId(), notification.userId(), channel.type(), clock.instant());
+            try {
+                channel.deliver(notification);
+                deliveries.markDelivered(
+                        notification.eventId(), notification.userId(), channel.type(), clock.instant());
+            } catch (RuntimeException e) {
+                if (failure == null) {
+                    failure = e;
+                } else {
+                    failure.addSuppressed(e);
+                }
+            }
+        }
+        if (failure != null) {
+            throw failure;
         }
     }
 }

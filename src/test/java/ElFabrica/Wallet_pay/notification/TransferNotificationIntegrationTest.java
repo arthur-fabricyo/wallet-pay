@@ -134,6 +134,20 @@ class TransferNotificationIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void failingChannelOfTheSenderDoesNotBlockTheReceiversNotification() throws Exception {
+        TestUser ana = createVerifiedUser("Ana Souza", "500.00");
+        TestUser bruno = createVerifiedUser("Bruno Lima", "0.00");
+        enableEmail(ana);
+        doThrow(new IllegalStateException("smtp down")).when(emailChannel).deliver(any());
+
+        assertThatThrownBy(() -> handler.handle(transferEvent(ana.userId(), bruno.userId())))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(pushGateway.sent).extracting(PushMessage::userId)
+                .containsExactlyInAnyOrder(ana.userId(), bruno.userId());
+    }
+
+    @Test
     void unknownUserIsDroppedWithoutException() {
         TestUser ana = createVerifiedUser("Ana Souza", "500.00");
 

@@ -11,6 +11,7 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -67,20 +68,37 @@ public class TransferCompletedHandler implements EventHandler {
         String amount = formatBrl(payload.amount());
         String when = DATE_TIME.format(event.occurredAt());
 
-        dispatcher.dispatch(new Notification(
+        Notification toSender = new Notification(
                 event.eventId(),
                 payload.senderUserId(),
                 Notification.TRANSFER_SENT,
                 "Transferência enviada",
                 "Você enviou " + amount + " para " + receiverName.get() + " em " + when + "."
-        ));
-        dispatcher.dispatch(new Notification(
+        );
+        Notification toReceiver = new Notification(
                 event.eventId(),
                 payload.receiverUserId(),
                 Notification.TRANSFER_RECEIVED,
                 "Transferência recebida",
                 "Você recebeu " + amount + " de " + senderName.get() + " em " + when + "."
-        ));
+        );
+
+        // Each person is notified independently: a failure for one must not stop the other.
+        RuntimeException failure = null;
+        for (Notification notification : List.of(toSender, toReceiver)) {
+            try {
+                dispatcher.dispatch(notification);
+            } catch (RuntimeException e) {
+                if (failure == null) {
+                    failure = e;
+                } else {
+                    failure.addSuppressed(e);
+                }
+            }
+        }
+        if (failure != null) {
+            throw failure;
+        }
     }
 
     /** Names are user-controlled: flatten control characters (line breaks) so they stay on one line in any channel. */
